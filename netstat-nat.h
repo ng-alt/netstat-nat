@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.5 2002/09/22 20:10:20 mardan Exp $     
+# $Id: netstat-nat.h,v 1.7 2003/01/24 21:24:34 mardan Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
@@ -35,7 +35,7 @@
 #include <arpa/inet.h>
 
 
-#define VERSION		"1.4.1"
+#define VERSION		"1.4.2"
 #define ROWS		6
 
 
@@ -45,6 +45,8 @@ void protocol_udp_ass(char *line);
 void protocol_udp_unr(char *line);
 void protocol_icmp_unr(char *line);
 void protocol_icmp_rep(char *line);
+void protocol_unknown_unr(char *line);
+void protocol_unknown_rep(char *line);
 void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void extract_ip(char *gen_buffer);
@@ -55,6 +57,6 @@ int match(char *string, char *pattern);
 int check_if_source(char *host);
 int check_if_destination(char *host);
 void lookup_portname(char *port,char *proto);
-void oopsy();
+void oopsy(int size);
 
 /* The End */

@@ -1,9 +1,23 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.19 2002/09/22 20:10:19 mardan Exp $     
+# $Id: netstat-nat.c,v 1.22 2003/02/08 17:41:44 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.22  2003/02/08 17:41:44  mardan
+# made some last minor changes.
+# ready to release v1.4.2
+#
+# Revision 1.21  2003/01/24 21:24:34  mardan
+# Added unknown protocol, display as 'raw'
+# Fixed hussle up in states when sorting connections
+#
+# Revision 1.20  2003/01/02 15:40:48  mardan
+# Merged patch from Marceln, which removes unused variables, more understandable
+# memory allocation error message, check to exit when there are no NAT connections
+# and making netstat-nat compatible with uLibC.
+# Updated files to v1.4.2
+#
 # Revision 1.19  2002/09/22 20:10:19  mardan
 # Added '-v: print version'
 # Added 'uninstall' to Makefile
@@ -116,7 +130,7 @@
 #include "netstat-nat.h"
 
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.19 2002/09/22 20:10:19 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.22 2003/02/08 17:41:44 mardan Exp $";
 char SRC_IP[35];
 char DST_IP[35];
 int SNAT = 1;
@@ -148,7 +162,7 @@ int main(int argc, char *argv[])
     int index,a,b,c,j,r;
     
     if ((connection_table = (char ***)malloc((1) *sizeof(char **))) == NULL)
-	(void)oopsy();
+	(void)oopsy(sizeof(char **));
     // check parameters
     while ((c = getopt(argc, argv, args)) != -1 ) {
 	switch (c) {
@@ -254,18 +268,34 @@ int main(int argc, char *argv[])
 		protocol_icmp_rep(line);
 		}
 	    }
+	
+	if ((!strcmp(PROTOCOL, "raw")) || (!strcmp(PROTOCOL, ""))) {
+	    if((match(line, "unknown")) && (match(line, "UNREPLIED"))) {
+		protocol_unknown_unr(line);
+		}
+	    if((match(line, "unknown")) && (!match(line, "UNREPLIED"))) {
+		protocol_unknown_rep(line);
+		}
+	    }
+	
+	
+	
 	}
     fclose(f);
     
     // create index of arrays pointed to main connection array
+    if (connection_index == 0) {
+	// There are no connections at this moment!
+	return (0);
+	}
     if ((pa = (char ***)malloc((connection_index) * sizeof(char **))) == NULL)
-	(void)oopsy();
-    for (index = 0; index < connection_index; index++)	{
+	(void)oopsy(connection_index*sizeof(char **));
+    for (index = 0; index < connection_index; index++) {
 	if ((pa[index] = (char **)malloc((ROWS) * sizeof(char *))) == NULL)
-	    (void)oopsy();
+	    (void)oopsy(ROWS*sizeof(char *));
 	for (j=0; j<ROWS; j++) {
 	    if ((pa[index][j] = (char *)malloc(2)) == NULL)
-		(void)oopsy();
+		(void)oopsy(2);
 	    pa[index][j] = &connection_table[index][j][0];
 	    }
 	}
@@ -274,12 +304,12 @@ int main(int argc, char *argv[])
 	for (b = a+1; b < connection_index; b++) {
 	    r = strcmp(pa[a][0], pa[b][0]);
 	    if (r > 0) {
-		for (j=0;j<ROWS-1;j++) {
+		for (j=0;j<ROWS;j++) {
 		    store = pa[a][j];
 		    pa[a][j] = pa[b][j];
 		    pa[b][j] = store;
 		    }
-		}	    
+		}
 	    if (r == 0) {
 		if (strcmp(pa[a][SORT_ROW], pa[b][SORT_ROW]) > 0) {
 		    for (j=0;j<ROWS;j++) {
@@ -402,7 +432,6 @@ void protocol_udp(char *line)
 		check_src_dst(buf[0],buf[2],buf[6],buf[4],buf[5]," ");
 		}    
 	    }	
-	
 	}
     }
 
@@ -558,6 +587,83 @@ void protocol_icmp_rep(char *line)
 	    }
 	}
     }
+
+// unknwon/stateless protocols
+void protocol_unknown_unr(char *line) 
+    {
+    char *token;
+    char *buf[35];
+    int count;
+    token = strtok(line," ");
+    count = 0;
+    
+    while(token != NULL) {
+	buf[count] = token;
+	if(!strlen(buf[count]))
+	    buf[count]="";
+	count++;
+	token = strtok(NULL," ");
+ 	}
+    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[6], "=")) && (match(buf[7], "="))) {
+        extract_ip(buf[3]);
+        extract_ip(buf[7]);
+        extract_ip(buf[4]);
+        extract_ip(buf[6]);
+        if (SNAT) {
+	    if ((!strcmp(buf[3],buf[7])==0) && (strcmp(buf[4],buf[6])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[6]," "," ",buf[5]);
+    		}
+	    }
+	if (DNAT) {
+	    if ((strcmp(buf[3],buf[7])==0) && (!strcmp(buf[4],buf[6])==0)) {	
+    		check_src_dst(buf[0],buf[3],buf[6]," "," ",buf[5]);
+		}    
+	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[3],buf[7])==0) && (strcmp(buf[4],buf[6])==0)) {	
+    		check_src_dst(buf[0],buf[3],buf[6]," "," ",buf[5]);
+		}    
+	    }
+	}
+    }
+
+void protocol_unknown_rep(char *line) 
+    {
+    char *token;
+    char *buf[35];
+    int count;
+    token = strtok(line," ");
+    count = 0;
+    
+    while(token != NULL) {
+	buf[count] = token;
+	if(!strlen(buf[count]))
+	    buf[count]="";
+	count++;
+	token = strtok(NULL," ");
+ 	}
+    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[5], "=")) && (match(buf[6], "="))) {
+        extract_ip(buf[3]);
+	extract_ip(buf[5]);
+	extract_ip(buf[4]);
+	extract_ip(buf[6]);
+	if (SNAT) {
+	    if ((!strcmp(buf[3],buf[6])==0) && (strcmp(buf[4],buf[5])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[5]," "," ","REPLIED");
+		}
+	    }
+	if (DNAT) {
+	    if ((strcmp(buf[3],buf[6])==0) && (!strcmp(buf[4],buf[5])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[5]," "," ","REPLIED");
+		}
+	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[3],buf[6])==0) && (strcmp(buf[4],buf[5])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[5]," "," ","REPLIED");
+		}
+	    }
+	}
+    }
     
 // -- End of NATed protocols
 
@@ -586,21 +692,21 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     char msg[50];
     
     if ((connection_table = (char ***)realloc(connection_table, (connection_index +1)*sizeof(char **))) == NULL)
-	(void)oopsy();
+	(void)oopsy((connection_index +1)*sizeof(char **));
     if ((connection_table[connection_index] = (char **)malloc(200 * sizeof(char *))) == NULL)
-	(void)oopsy();
+	(void)oopsy(200 * sizeof(char *));
     if ((connection_table[connection_index][0] = (char *)malloc(10)) == NULL)
-	(void)oopsy();
+	(void)oopsy(10);
     if ((connection_table[connection_index][1] = (char *)malloc(60)) == NULL)
-	(void)oopsy();
+	(void)oopsy(60);
     if ((connection_table[connection_index][2] = (char *)malloc(60)) == NULL)
-	(void)oopsy();
+	(void)oopsy(60);
     if ((connection_table[connection_index][3] = (char *)malloc(20)) == NULL)
-	(void)oopsy();
+	(void)oopsy(20);
     if ((connection_table[connection_index][4] = (char *)malloc(20)) == NULL)
-	(void)oopsy();
+	(void)oopsy(20);
     if ((connection_table[connection_index][5] = (char *)malloc(15)) == NULL)
-	(void)oopsy();
+	(void)oopsy(15);
     
     //ports
     if ((match(src_port, "=")) && (match(dst_port, "="))) {
@@ -615,17 +721,19 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
 	dst_port = split;
 	strcpy(connection_table[connection_index][4], dst_port);
 	}
-    //protocol
-    strncpy(protocol_b, protocol, 5);
-    strcpy(connection_table[connection_index][0], protocol);
+    if (strcmp(protocol,"icmp")==0 || strcmp(protocol,"unknown")==0) {
+        strcpy(connection_table[connection_index][3], "");
+	strcpy(connection_table[connection_index][4], "");
+	}
     //IP
-    if (strcmp(protocol_b,"icmp")!=0) {
-	strcpy(connection_table[connection_index][1], src_ip);
-	strcpy(connection_table[connection_index][2], dst_ip);
-    } else {
-	strcpy(connection_table[connection_index][1], src_ip);
-	strcpy(connection_table[connection_index][2], dst_ip);
-        }
+    strcpy(connection_table[connection_index][1], src_ip);
+    strcpy(connection_table[connection_index][2], dst_ip);
+    //protocol
+    if (strcmp(protocol,"unknown")==0) {
+	strcpy(protocol,"raw");
+	}
+    strncpy(protocol_b, protocol, 5);
+    strcpy(connection_table[connection_index][0], protocol_b);
     //status
     strcpy(status_b,status);
     token = strtok(status_b,"[");
@@ -641,7 +749,6 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
 
 void lookup_portname(char *port, char *proto)
     {
-    char *buf_portname;
     char buf_port[10];
     int portnr;
     struct servent *service;
@@ -666,7 +773,6 @@ int lookup_hostname(char *r_host)
     int addr;
     struct hostent *hp;
     char **p;
-    char *hostname;
     addr = inet_addr (r_host);
     hp=gethostbyaddr((char *) &addr, sizeof (addr), AF_INET);
     if (hp == NULL) {
@@ -675,7 +781,6 @@ int lookup_hostname(char *r_host)
 
     for (p = hp->h_addr_list; *p!=0;p++){
 	struct in_addr in;
-	char **q;
 	(void)memcpy(&in.s_addr, *p, sizeof(in.s_addr));
 	strcpy(r_host, "");
 	strcpy(r_host,hp->h_name);
@@ -735,9 +840,9 @@ int check_if_destination(char *host)
     return 0;
     }
 
-void oopsy()
+void oopsy(int size)
     {
-    printf("Hmm couldn't allocate memory...\n");
+    printf("Hmm couldn't allocate %i bytes\n", size);
     exit(1);
     }
 

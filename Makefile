@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 #
-# $Id: Makefile,v 1.5 2002/11/23 21:09:47 mardan Exp $ 
+# $Id: Makefile,v 1.7 2003/02/08 17:41:44 mardan Exp $ 
 #
 #
 # Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
@@ -23,7 +23,7 @@
 #
 #-------------------------------------------------------------------------------
 
-VERSION = 1.4.1
+VERSION = 1.4.2
 SHELL = /bin/sh
 BINDIR = /usr/bin
 ETCDIR = /etc
@@ -32,13 +32,13 @@ DOCDIR = /usr/share/doc
 INSTALL = install -c
 
 
-CC = gcc -O2
+CC = gcc -Wall -O2
 
 
 PROG_SRC = netstat-nat.c
 PROG_BIN = netstat-nat
 PROG_MAN = netstat-nat.1
-DOC = COPYING README INSTALL AUTHORS CHANGELOG
+DOC = COPYING README INSTALL AUTHORS CHANGELOG netstat-nat.spec
 
 all:	netstat-nat
 

@@ -1,8 +1,19 @@
-$Id: CHANGELOG,v 1.1 2002/11/23 21:09:47 mardan Exp $
+$Id: CHANGELOG,v 1.4 2003/02/09 17:26:11 mardan Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.2
+- Fixed hussle up displayed states when sorting 
+- Added support to display unknown protocols (displayed as 'raw')
+- Fixes rpmlint warnings in .spec for RPM users (1.4.1-2.src.rpm allready 
+  contains allready new .spec file)
+- Some more understandable memory alloaction errors, displays now how many bytes 
+  are allocated
+- Removed unused variables
+- Check in code to exit, when there are no NAT connections
+- Compatible with uLibC
+
 version: 1.4.1
 - Changed memory allocation of entries to be dynamic. (was only noticeble if you 
   support large numbers NAT connections)
