@@ -1,6 +1,6 @@
 Summary 	: netstat-nat displays NAT connections
 Name		: netstat-nat
-Version		: 1.4.3
+Version		: 1.4.4
 Release		: 1
 License		: GPL
 Packager	: Danny Wijsman <danny@tweegy.demon.nl>
@@ -21,7 +21,10 @@ Netstat-nat takes several arguments (but not needed).
 %setup
 
 %build
-make
+rm -f aclocal.m4
+autoreconf --force --install
+./configure
+make all
 
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -33,7 +36,7 @@ install -D -m 444 netstat-nat.1 %{buildroot}%{_mandir}/man1/netstat-nat.1
 
 %files
 %defattr(-,root,root)
-%doc COPYING README AUTHORS INSTALL CHANGELOG netstat-nat.spec
+%doc COPYING README AUTHORS INSTALL ChangeLog NEWS
 %{_bindir}/%{name}
 %{_mandir}/man*/*
 

@@ -1,9 +1,14 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.24 2003/09/01 20:36:52 mardan Exp $     
+# $Id: netstat-nat.c,v 1.25 2005/01/01 17:02:24 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.25  2005/01/01 17:02:24  mardan
+# Extraction of IPs and ports more dynamicly so it can be used with layer7 and
+# maybe others when layout of ip_conntrack changes
+# Added autoconf
+#
 # Revision 1.24  2003/09/01 20:36:52  mardan
 # Fixed small bug which didn't allow to display hostnames in expanded mode,
 # not enough bytes where allocated.
@@ -138,12 +143,13 @@
 
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.24 2003/09/01 20:36:52 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.25 2005/01/01 17:02:24 mardan Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
 int DNAT = 1;
 int LOCAL = 0;
+static char PROTOCOL[4];
 int connection_index = 0;
 char ***connection_table;
 
@@ -156,7 +162,6 @@ int main(int argc, char *argv[])
     static int EXT_VIEW = 0;
     static int RESOLVE = 1;
     static int no_hdr = 0;
-    static char PROTOCOL[4];
     FILE *f;
     char line[200];
     char src[50];
@@ -231,6 +236,7 @@ int main(int argc, char *argv[])
     
     // some checking for IPTables and read file
     if ((f = fopen("/proc/net/ip_conntrack","r")) == NULL) {
+//    if ((f = fopen("./conntrack.dump2","r")) == NULL) {
 	printf("Could not read info about connections from the kernel, make sure netfilter is enabled in kernel or by modules.\n");
 	return 1;
 	}
@@ -249,43 +255,9 @@ int main(int argc, char *argv[])
 	}
 
     while (fgets(line, sizeof(line), f) != NULL) 
-	{
-	if ((!strcmp(PROTOCOL, "tcp")) || (!strcmp(PROTOCOL, ""))) {
-	    if(match(line, "tcp")) {
-		protocol_tcp(line);
-		}
-	    }
-	    
-	if ((!strcmp(PROTOCOL, "udp")) || (!strcmp(PROTOCOL, ""))) {
-	    if((match(line, "udp")) && (match(line, "UNREPLIED"))) {
-		protocol_udp_unr(line);
-		}
-	    if((match(line, "udp")) && (match(line, "ASSURED"))) {
-		protocol_udp_ass(line);
-		}
-	    if((match(line, "udp")) && (!match(line, "ASSURED")) && (!match(line, "UNREPLIED"))) {
-		protocol_udp(line); 
-		}
-	    }
-	        
-	if ((!strcmp(PROTOCOL, "icmp")) || (!strcmp(PROTOCOL, ""))) {
-	    if((match(line, "icmp")) && (match(line, "UNREPLIED"))) {
-		protocol_icmp_unr(line);
-		}
-	    if((match(line, "icmp")) && (!match(line, "UNREPLIED"))) {
-		protocol_icmp_rep(line);
-		}
-	    }
-	
-	if ((!strcmp(PROTOCOL, "raw")) || (!strcmp(PROTOCOL, ""))) {
-	    if((match(line, "unknown")) && (match(line, "UNREPLIED"))) {
-		protocol_unknown_unr(line);
-		}
-	    if((match(line, "unknown")) && (!match(line, "UNREPLIED"))) {
-		protocol_unknown_rep(line);
-		}
-	    }
-	}
+    {
+        process_entry(line);
+    }
 
     fclose(f);
     
@@ -340,339 +312,142 @@ int main(int argc, char *argv[])
 	if (!EXT_VIEW) {
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][1], 29 - strlen(pa[index][3]));    
-	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);
-	    snprintf(src, sizeof(src),  "%-31s", buf2);
+	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
+                snprintf(buf2, sizeof(buf2), "%s", buf);
+	    }
+            else {
+                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);            
+            }
+            snprintf(src, sizeof(src),  "%-31s", buf2);
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][2], 29 - strlen(pa[index][4]));    
-	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);
+	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    }
+            else {
+                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);            
+            }
 	    snprintf(dst, sizeof(dst), "%-31s", buf2);
 	} else {
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][1], 39 - strlen(pa[index][3]));    
-	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);
-	    snprintf(src , sizeof(src), "%-41s", buf2);
+	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    }
+            else {
+	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);
+	    }
+            snprintf(src , sizeof(src), "%-41s", buf2);
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][2], 39 - strlen(pa[index][4]));    
-	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);
-	    snprintf(dst, sizeof(dst), "%-41s", buf2);
+	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    }
+            else {
+	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);
+	    }
+            snprintf(dst, sizeof(dst), "%-41s", buf2);
 	    }
 	printf("%-6s%s%s%-11s\n", pa[index][0], src, dst, pa[index][5]);
 	}
     return(0);
     }
 
-// -- NATed protocols
+// get protocol
+int get_protocol(char *line, char *protocol)
+{
+    if (string_search(line, "tcp")) {
+        memcpy(protocol, "tcp", 3);
+    }
+    else if (string_search(line, "udp")) {
+        memcpy(protocol, "udp", 3);
+    }
+    else if (string_search(line, "icmp")) {
+        memcpy(protocol, "icmp", 4);
+    }
+    else {
+        memcpy(protocol, "raw", 3);
+    }
+//    printf("PROTO: %s\n", protocol);
+    return(0);
+}
 
-// NATed tcp protocol
-void protocol_tcp(char *line)
-    {
-    char *token;
-    char *buf[35];
+// get connection status
+int get_connection_state(char *line, char *state)
+{
+    if (string_search(line, "ESTABLISHED")) {
+        memcpy(state, "ESTABLISHED", 11);
+    }
+    else if (string_search(line, "TIME_WAIT")) {
+        memcpy(state, "TIME_WAIT", 9);
+    }    
+    else if (string_search(line, "UNREPLIED")) {
+        memcpy(state, "UNREPLIED", 9);
+    }    
+    else if (string_search(line, "CLOSE")) {
+        memcpy(state, "CLOSE", 5);
+    }    
+    else if (string_search(line, "ASSURED")) {
+        memcpy(state, "ASSURED", 7);
+    }
+    else {
+        if (string_search(line, "udp")) {
+            memcpy(state, "UNREPLIED", 9);
+        }
+        else {
+            memcpy(state, " ", 1);
+        }
+    }    
+//    printf("STATE: %s\n", state);
+    return(0);
+}
+
+void process_entry(char *line)
+{
     int count;
-    token = strtok(line, " ");
     count = 0;
+    char srcip_f[16] = "";
+    char dstip_f[16] = "";
+    char srcip_s[16] = "";
+    char dstip_s[16] = "";
+    char srcport[6] = "";
+    char dstport[6] = "";
+    char protocol[5] = "";
+    char state[12] = "";
 
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
-	}
-    
-    if ((match(buf[4], "=")) && (match(buf[5], "=")) && (match(buf[8], "=")) && (match(buf[9], "="))) {
-	extract_ip(buf[4]);
-	extract_ip(buf[9]);
-	extract_ip(buf[5]);
-	extract_ip(buf[8]);
-	if (SNAT) {
-	    if ((!strcmp(buf[4], buf[9]) == 0) && (strcmp(buf[5], buf[8]) == 0)) {		
-		check_src_dst(buf[0], buf[4], buf[8], buf[6], buf[7], buf[3]);
-		}
+    search_first_hit("src=", line, srcip_f);    
+    search_first_hit("dst=", line, dstip_f);    
+    search_sec_hit("src=", line, srcip_s);    
+    search_sec_hit("dst=", line, dstip_s);    
+    search_first_hit("sport=", line, srcport);    
+    search_first_hit("dport=", line, dstport);    
+
+    get_protocol(line, protocol);
+    if (strcmp(PROTOCOL, "")) {
+        if (strncmp(PROTOCOL, protocol, 3)) {
+//            printf("RETURN\n");
+            return;
+        }
+    }
+    get_connection_state(line, state);
+    if (SNAT) {
+	if ((!strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		
+  	    check_src_dst(protocol, srcip_f, dstip_f, srcport, dstport, state);
 	    }
-	if (DNAT) {
-	    if ((strcmp(buf[4], buf[9]) == 0) && (!strcmp(buf[5], buf[8]) == 0)) {		
-		check_src_dst(buf[0], buf[4], buf[8], buf[6], buf[7], buf[3]);
-		}
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[4], buf[9]) == 0) && (strcmp(buf[5], buf[8]) == 0)) {		
-		check_src_dst(buf[0], buf[4], buf[8], buf[6], buf[7], buf[3]);
-		}
-	    }
+    }
+    if (DNAT) {
+	if ((strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0)) {		
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, state);
 	}
     }
-
-// NATed udp protocol
-void protocol_udp(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[2], "=")) && (match(buf[3], "=")) && (match(buf[6], "=")) && (match(buf[6], "="))) {
-        extract_ip(buf[2]);
-	extract_ip(buf[3]);
-	extract_ip(buf[6]);
-	extract_ip(buf[7]);
-	if (SNAT) {
-	    if ((!strcmp(buf[2], buf[7]) == 0) && (strcmp(buf[3], buf[6]) == 0)) {	
-		check_src_dst(buf[0], buf[2], buf[6], buf[4], buf[5], " ");
-		}    
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[2], buf[7]) == 0) && (!strcmp(buf[3], buf[6]) == 0)) {	
-		check_src_dst(buf[0], buf[2], buf[6], buf[4], buf[5], " ");
-		}    
-	    }	
-	if (LOCAL) {
-	    if ((strcmp(buf[2], buf[7]) == 0) && (strcmp(buf[3], buf[6]) == 0)) {	
-		check_src_dst(buf[0], buf[2], buf[6], buf[4], buf[5], " ");
-		}    
-	    }	
+    if (LOCAL) {
+        if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		
+            check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, state);
 	}
     }
+//    printf("%s %s %s %s %s %s\n", protocol, srcip_f, dstip_f, srcip_s, dstip_s, state);
+}
 
-void protocol_udp_ass(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[7], "=")) && (match(buf[8], "="))) {
-        extract_ip(buf[3]);
-	extract_ip(buf[4]);
-	extract_ip(buf[7]);
-	extract_ip(buf[8]);
-	if(SNAT) {
-	    if ((!strcmp(buf[3], buf[8]) == 0) && (strcmp(buf[4], buf[7]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[7], buf[5], buf[6], buf[11]);
-		}    
-	    }
-	if(DNAT) {
-	    if ((strcmp(buf[3], buf[8]) == 0) && (!strcmp(buf[4], buf[7]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[7], buf[5], buf[6], buf[11]);
-		}    
-	    }
-	if(LOCAL) {
-	    if ((strcmp(buf[3], buf[8]) == 0) && (strcmp(buf[4], buf[7]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[7], buf[5], buf[6], buf[11]);
-		}    
-	    }
-	}
-    }
-
-void protocol_udp_unr(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[8], "=")) && (match(buf[9], "="))) {
-        extract_ip(buf[3]);
-	extract_ip(buf[4]);
-	extract_ip(buf[8]);
-	extract_ip(buf[9]);
-	if (SNAT) {
-	    if ((!strcmp(buf[3], buf[9]) == 0) && (strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], buf[5], buf[6], buf[7]);
-		}    
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[3], buf[9]) == 0) && (!strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], buf[5], buf[6], buf[7]);
-		}    
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[3], buf[9]) == 0) && (strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], buf[5], buf[6], buf[7]);
-		}    
-	    }
-	}
-    }
-
-// NATed icmp protocol
-void protocol_icmp_unr(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[9], "=")) && (match(buf[10], "="))) {
-        extract_ip(buf[3]);
-        extract_ip(buf[10]);
-        extract_ip(buf[4]);
-        extract_ip(buf[9]);
-        if (SNAT) {
-	    if ((!strcmp(buf[3], buf[10]) == 0) && (strcmp(buf[4], buf[9]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[9], " ", " ", buf[8]);
-    		}
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[3], buf[10]) == 0) && (!strcmp(buf[4], buf[9]) == 0)) {	
-    		check_src_dst(buf[0], buf[3], buf[9], " ", " ", buf[8]);
-		}    
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[3], buf[10]) == 0) && (strcmp(buf[4], buf[9]) == 0)) {	
-    		check_src_dst(buf[0], buf[3], buf[9], " ", " ", buf[8]);
-		}    
-	    }
-	}
-    }
-
-void protocol_icmp_rep(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[8], "=")) && (match(buf[9], "="))) {
-        extract_ip(buf[3]);
-	extract_ip(buf[9]);
-	extract_ip(buf[4]);
-	extract_ip(buf[8]);
-	if (SNAT) {
-	    if ((!strcmp(buf[3], buf[9]) == 0) && (strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], " ", " ", "REPLIED");
-		}
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[3], buf[9]) == 0) && (!strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], " ", " ", "REPLIED");
-		}
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[3], buf[9]) == 0) && (strcmp(buf[4], buf[8]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[8], " ", " ", "REPLIED");
-		}
-	    }
-	}
-    }
-
-// unknwon/stateless protocols
-void protocol_unknown_unr(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[6], "=")) && (match(buf[7], "="))) {
-        extract_ip(buf[3]);
-        extract_ip(buf[7]);
-        extract_ip(buf[4]);
-        extract_ip(buf[6]);
-        if (SNAT) {
-	    if ((!strcmp(buf[3], buf[7]) == 0) && (strcmp(buf[4], buf[6]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[6], " ", " ", buf[5]);
-    		}
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[3], buf[7]) == 0) && (!strcmp(buf[4], buf[6]) == 0)) {	
-    		check_src_dst(buf[0], buf[3], buf[6], " ", " ", buf[5]);
-		}    
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[3], buf[7]) == 0) && (strcmp(buf[4], buf[6]) == 0)) {	
-    		check_src_dst(buf[0], buf[3], buf[6], " ", " ", buf[5]);
-		}    
-	    }
-	}
-    }
-
-void protocol_unknown_rep(char *line) 
-    {
-    char *token;
-    char *buf[35];
-    int count;
-    token = strtok(line, " ");
-    count = 0;
-    
-    while(token != NULL) {
-	buf[count] = token;
-	if(!strlen(buf[count]))
-	    buf[count] = "";
-	count++;
-	token = strtok(NULL, " ");
- 	}
-    if ((match(buf[3], "=")) && (match(buf[4], "=")) && (match(buf[5], "=")) && (match(buf[6], "="))) {
-        extract_ip(buf[3]);
-	extract_ip(buf[5]);
-	extract_ip(buf[4]);
-	extract_ip(buf[6]);
-	if (SNAT) {
-	    if ((!strcmp(buf[3], buf[6]) == 0) && (strcmp(buf[4], buf[5]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[5], " ", " ", "REPLIED");
-		}
-	    }
-	if (DNAT) {
-	    if ((strcmp(buf[3], buf[6]) == 0) && (!strcmp(buf[4], buf[5]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[5], " ", " ", "REPLIED");
-		}
-	    }
-	if (LOCAL) {
-	    if ((strcmp(buf[3], buf[6]) == 0) && (strcmp(buf[4], buf[5]) == 0)) {	
-		check_src_dst(buf[0], buf[3], buf[5], " ", " ", "REPLIED");
-		}
-	    }
-	}
-    }
-    
-// -- End of NATed protocols
 
 // -- Internal used functions
 // Check filtering by source and destination IP
@@ -691,12 +466,6 @@ void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, c
 
 void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
     {
-    char *split;
-    char status_b[15];
-    char protocol_b[5];
-    char *token;
-    char *buff;
-    char msg[50];
     
     connection_table = (char ***) xrealloc(connection_table, (connection_index +1) * sizeof(char **));
     connection_table[connection_index] = (char **) xcalloc(200 * sizeof(char *));
@@ -707,42 +476,12 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     connection_table[connection_index][4] = (char *) xcalloc(20);
     connection_table[connection_index][5] = (char *) xcalloc(15);
     
-    //ports
-    if ((match(src_port, "=")) && (match(dst_port, "="))) {
-	//source port
-	split = strtok(src_port, "=");
-	split = strtok(NULL, "=");
-	src_port = split;
-	strcopy(connection_table[connection_index][3], 20, src_port);
-	//destination port
-	split = strtok(dst_port, "=");
-	split = strtok(NULL, "=");
-	dst_port = split;
-	strcopy(connection_table[connection_index][4], 20, dst_port);
-	}
-    if (strcmp(protocol, "icmp") == 0 || strcmp(protocol, "unknown") == 0) {
-        strcopy(connection_table[connection_index][3], 20, "");
-	strcopy(connection_table[connection_index][4], 20, "");
-	}
-    //IP
+    strcopy(connection_table[connection_index][3], 20, src_port);
+    strcopy(connection_table[connection_index][4], 20, dst_port);
     strcopy(connection_table[connection_index][1], 60, src_ip);
     strcopy(connection_table[connection_index][2], 60, dst_ip);
-    //protocol
-    if (strcmp(protocol, "unknown") == 0) {
-	strcpy(protocol, "raw");
-	}
-    strncpy(protocol_b, protocol, 5);
-    strcopy(connection_table[connection_index][0], 10, protocol_b);
-    //status
-    strcopy(status_b, sizeof(status_b), status);
-    token = strtok(status_b, "[");
-    buff = token;
-    token = strtok(NULL, "[");
-    token = strtok(buff, "]");
-    buff = token;
-    token = strtok(NULL, "]");
-    snprintf(msg, sizeof(msg), "%s", buff);
-    strcopy(connection_table[connection_index][5], 15, msg);
+    strcopy(connection_table[connection_index][0], 10, protocol);
+    strcopy(connection_table[connection_index][5], 15, status);
     connection_index++;
     }
 
@@ -809,7 +548,7 @@ int lookup_ip(char *hostname, size_t hostname_size)
     strcopy(hostname, hostname_size, ip);
     return 1;
     }
-
+/*
 int match(char *string, char *pattern) 
     {
     int i;
@@ -820,7 +559,7 @@ int match(char *string, char *pattern)
 
     if (i != 0) {
 	(void)regerror(i, &re, buf, sizeof(buf));
-	return 0;                       /* report error */
+	return 0;                       
 	}
     
     i = regexec(&re, string, (size_t) 0, NULL, 0);
@@ -828,12 +567,12 @@ int match(char *string, char *pattern)
 
     if (i != 0) {
 	(void)regerror(i, &re, buf, sizeof(buf));
-	return 0;                       /* report error */
+	return 0;                       
 	}
 
     return 1;
     }
-
+*/
 int check_if_source(char *host) 
     {
     if ((strcmp(host, SRC_IP) == 0) || (strcmp(SRC_IP, "") == 0)) {
@@ -875,6 +614,89 @@ static void *xrealloc(void *oldbuf, size_t newbufsize)
 	exit(1);
 	}
     }
+
+
+int string_search(char *string, char *search)
+{
+    int searchLen;
+    int i;
+    searchLen = strlen(search);
+    if (searchLen > strlen(string)) {
+	return(0); // this can't match 
+    }
+    for (i = 0; i < strlen(string) - searchLen + 1; i++) {
+	if (!strncasecmp((char *)&string[i], search, searchLen)) {
+	    return(1); // we got hit
+	}
+    }
+    return(0);
+}
+
+
+int search_first_hit(char *search, char *line, char *ret)
+{
+    unsigned int searchLen;
+    unsigned int i;
+    unsigned int j;
+    unsigned int lineLen;
+    
+    lineLen = strlen(line);
+    searchLen = strlen(search);
+
+    if (searchLen > lineLen) {
+	return(1); // this can't match, invalid data?
+    }
+    for (i = 0; i < lineLen - searchLen + 1; i++) {
+	if (!strncasecmp((char *)&line[i], search, searchLen)) {
+	    break; // we got hit
+	}
+    }
+    for (j = i + searchLen; j < i + 15 + searchLen; j++) {
+        if (j > lineLen) {
+            return(1); // incomplete data
+        }
+        if (line[j] == ' ') {
+            break; // we reach _space_ delimiter
+        }
+    } 
+    memcpy(ret, &line[i + searchLen], j - i - searchLen);
+    return(0);
+}
+
+
+int search_sec_hit(char *search, char *line, char *ret)
+{
+    unsigned int searchLen;
+    unsigned int i;
+    unsigned int j;
+    unsigned int got_first = 0;
+    unsigned int lineLen;
+    
+    lineLen = strlen(line);
+    searchLen = strlen(search);
+
+    if (searchLen > lineLen) {
+	return(1); // this can't match, invalid data?
+    }
+    for (i = 0; i < lineLen - searchLen + 1; i++) {
+	if (!strncasecmp((char *)&line[i], search, searchLen)) {
+	    if (got_first) {
+                break; // we got hit (second)
+            }
+            got_first = 1;
+	}
+    }
+    for (j = i + searchLen; j < i + 15 + searchLen; j++) {
+        if (j > lineLen) {
+            return(1); // incomplete data
+        }
+        if (line[j] == ' ') {
+            break; // we reach _space_ delimiter
+        }
+    } 
+    memcpy(ret, &line[i + searchLen], j - i - searchLen);
+    return(0);
+}
 
 
 void display_help()

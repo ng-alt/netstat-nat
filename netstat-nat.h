@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.8 2003/08/31 10:59:15 mardan Exp $     
+# $Id: netstat-nat.h,v 1.9 2005/01/01 17:02:24 mardan Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2002 by D.Wijsman (danny@tweegy.demon.nl). 
@@ -28,32 +28,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <regex.h>
+//#include <regex.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <strings.h>
 
-#define VERSION		"1.4.3"
+#define VERSION		"1.4.4"
 #define ROWS		6
 
 
-void protocol_tcp(char *line);
-void protocol_udp(char *line);
-void protocol_udp_ass(char *line);
-void protocol_udp_unr(char *line);
-void protocol_icmp_unr(char *line);
-void protocol_icmp_rep(char *line);
-void protocol_unknown_unr(char *line);
-void protocol_unknown_rep(char *line);
+int get_protocol(char *line, char *protocol);
+int get_connection_state(char *line, char *state);
+void process_entry(char *line);
 void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void extract_ip(char *gen_buffer);
 void display_help();
 int lookup_hostname(char **r_host);
 int lookup_ip(char *hostname, size_t hostname_size);
-int match(char *string, char *pattern);
+//int match(char *string, char *pattern);
 int check_if_source(char *host);
 int check_if_destination(char *host);
 void lookup_portname(char **port, char *proto);
