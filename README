@@ -1,4 +1,4 @@
-$Id: README,v 1.3 2002/07/12 20:05:54 mardan Exp $
+$Id: README,v 1.6 2002/08/06 19:32:54 mardan Exp $
 
 
 Description:
@@ -14,8 +14,11 @@ For any program options see sector 'Usage' section below.
 
 Compiling:
 -------------------------------------------------------------------------------
-gcc netstat-nat.c -o netstat-nat
-strip netstat-nat
+Type the following in your favorite console: 
+'make'
+'make install'
+If all goes well you should now be able to run the program.
+'netstat-nat'
 
 -------------------------------------------------------------------------------
 
@@ -24,7 +27,7 @@ Usage:
 -------------------------------------------------------------------------------
 netstat-nat -h			: displays help
 netstat-nat -n			: displays NAT connections without 
-				  hostname-resolving.
+				  host/portname-resolving.
 netstat-nat -p tcp | udp | icmp	: diplays NAT connections with protocol 
 				  selection.
 netstat-nat -s <source-host>	: display connections by source IP/hostname
@@ -33,6 +36,7 @@ netstat-nat -S			: display SNAT connections
 netstat-nat -D			: display DNAT connections
 				  (default: both) 
 netstat-nat -x 			: extend the view of the hostnames
+netstat-nat -o			: strip output header
 -------------------------------------------------------------------------------
 
 
@@ -46,9 +50,11 @@ http://tweegy.demon.nl/projects/netstat-nat/
 Files:
 -------------------------------------------------------------------------------
 netstat-nat.c
+netstat-nat.h
 netstat-nat.1
-README
 COPYING
+Makefile
+README
 
 -------------------------------------------------------------------------------
 

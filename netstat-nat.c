@@ -1,9 +1,25 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.11 2002/07/12 20:05:54 mardan Exp $     
+# $Id: netstat-nat.c,v 1.15 2002/08/07 19:25:59 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.15  2002/08/07 19:25:59  mardan
+# Fixed bug, displayed wrong icmp connection in state REPLIED (dest was gateway).
+#
+# Revision 1.14  2002/08/07 19:02:54  mardan
+# Fixed 'icmp' bug. Segmentation fault occured when displaying NATed icmp connections.
+#
+# Revision 1.13  2002/08/06 19:32:54  mardan
+# Added small feature: no header output.
+# Lots of code cleanup.
+#
+# Revision 1.12  2002/08/03 00:22:22  mardan
+# Added portname resolving based on the listed names in 'services'.
+# Re-arranged the layout.
+# Added a Makefile and a header file.
+# Updated the README.
+#
 # Revision 1.11  2002/07/12 20:05:54  mardan
 # Added argument for extended view of hostnames.
 # Moved display-code into one function.
@@ -79,45 +95,36 @@
 #-------------------------------------------------------------------------------
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <regex.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.11 2002/07/12 20:05:54 mardan Exp $";
-static char const rcsname[] = "$Author: mardan $";
-static int RESOLVE = 1;
-static char PROTOCOL[4] = "";
-static char SRC_IP[35] = "";
-static char DST_IP[35] = "";
-static int SNAT = 1;
-static int DNAT = 1;
-static int EXT_VIEW = 0;
-int main(argc, argv)
-int argc;
+#include "netstat-nat.h"
 
-char *argv[];
+
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.15 2002/08/07 19:25:59 mardan Exp $";
+int RESOLVE = 1;
+char PROTOCOL[4] = "";
+char SRC_IP[35] = "";
+char DST_IP[35] = "";
+int SNAT = 1;
+int DNAT = 1;
+int EXT_VIEW = 0;
+
+
+int main(int argc, char *argv[])
     {
+    const char *args = "hnp:s:d:SDxo";
     int c;
-    const char *args = "hnp:s:d:SDx";
-    int ret;
-    int argerr;
+    int no_hdr = 0;
     FILE *f;
     char line[200];
+    
     // check parameters
     while ((c = getopt(argc, argv, args)) != -1 ) {
 	switch (c) {
 	case 'h':
-	    printf("args: -h: displays this help\n");
-	    printf("      -n: don't resolve hostnames\n");
-	    printf("      -p tcp | udp | icmp  : display selected protocol\n");
-	    printf("      -s <source-host>     : display connections by source\n");
-	    printf("      -d <destination-host>: display connections by destination\n");
-	    printf("      -S: display SNAT connections\n");
-	    printf("      -D: display DNAT connections (default: SNAT & DNAT)\n"); 
-	    printf("      -x: extended hostnames view\n");
+	    display_help();
+	    return 1;
+	case '?':
+	    display_help();
 	    return 1;
 	case 'n':
 	    RESOLVE = 0;
@@ -142,6 +149,9 @@ char *argv[];
 	case 'x':
 	    EXT_VIEW = 1;
 	    break;
+	case 'o':
+	    no_hdr = 1;
+	    break;
 	}
     }
     
@@ -153,10 +163,12 @@ char *argv[];
 	}
     
     // process conntrack table
-    if (!EXT_VIEW) {
-	printf("%-6s%-25s%-25s%-13s%-6s","Proto","NATed Address","Foreign Address","Ports","State\n");
-    } else {
-	printf("%-6s%-35s%-35s%-13s%-6s","Proto","NATed Address","Foreign Address","Ports","State\n");
+    if (!no_hdr) {
+	if (!EXT_VIEW) {
+	    printf("%-6s%-31s%-31s%-6s\n","Proto","NATed Address","Foreign Address","State");
+	} else {
+	    printf("%-6s%-41s%-41s%-6s\n","Proto","NATed Address","Foreign Address","State");
+	    }
 	}
     while (fgets(line,1000,f)!=NULL) {
 	if ((!strcmp(PROTOCOL, "tcp")) || (!strcmp(PROTOCOL, ""))) {
@@ -193,7 +205,7 @@ char *argv[];
 // -- NATed protocols
 
 // NATed tcp protocol
-int protocol_tcp(char *line)
+void protocol_tcp(char *line)
     {
     char *token;
     char *buf[35];
@@ -224,11 +236,10 @@ int protocol_tcp(char *line)
 		}
 	    }
 	}
-    return(1);
     }
 
 // NATed udp protocol
-int protocol_udp(char *line) 
+void protocol_udp(char *line) 
     {
     char *token;
     char *buf[35];
@@ -259,10 +270,9 @@ int protocol_udp(char *line)
 		}    
 	    }	
 	}
-    return(1);
     }
 
-int protocol_udp_ass(char *line) 
+void protocol_udp_ass(char *line) 
     {
     char *token;
     char *buf[35];
@@ -293,10 +303,9 @@ int protocol_udp_ass(char *line)
 		}    
 	    }
 	}
-    return(1);
     }
 
-int protocol_udp_unr(char *line) 
+void protocol_udp_unr(char *line) 
     {
     char *token;
     char *buf[35];
@@ -327,11 +336,10 @@ int protocol_udp_unr(char *line)
 		}    
 	    }
 	}
-    return(1);
     }
 
 // NATed icmp protocol
-int protocol_icmp_unr(char *line) 
+void protocol_icmp_unr(char *line) 
     {
     char *token;
     char *buf[35];
@@ -362,10 +370,9 @@ int protocol_icmp_unr(char *line)
 		}    
 	    }
 	}
-    return(1);
     }
 
-int protocol_icmp_rep(char *line) 
+void protocol_icmp_rep(char *line) 
     {
     char *token;
     char *buf[35];
@@ -387,23 +394,22 @@ int protocol_icmp_rep(char *line)
 	extract_ip(buf[8]);
 	if (SNAT) {
 	    if ((!strcmp(buf[3],buf[9])==0) && (strcmp(buf[4],buf[8])==0)) {	
-		check_src_dst(buf[0],buf[3],buf[9]," "," ","[REPLIED]");
+		check_src_dst(buf[0],buf[3],buf[8]," "," ","REPLIED");
 		}
 	    }
 	if (DNAT) {
 	    if ((strcmp(buf[3],buf[9])==0) && (!strcmp(buf[4],buf[8])==0)) {	
-		check_src_dst(buf[0],buf[3],buf[9]," "," ","[REPLIED]");
+		check_src_dst(buf[0],buf[3],buf[8]," "," ","REPLIED");
 		}
 	    }
 	}
-    return(1);
     }
     
 // -- End of NATed protocols
 
 // -- Internal used functions
 // Check filtering by source and destination IP
-int check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status) 
+void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status) 
     {
     if ((check_if_source(src_ip)) && (strcmp(DST_IP,"")==0)) {
 	print_connection(protocol,src_ip,dst_ip,src_port,dst_port,status);
@@ -414,65 +420,132 @@ int check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, ch
     else if ((check_if_destination(dst_ip)) && (check_if_source(src_ip))) {
 	print_connection(protocol,src_ip,dst_ip,src_port,dst_port,status);
 	}
-    return(1);
     }
 
-int print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
+void print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
     {
-    char gen_buffer[35] = "";
-    char ports[12] = "";
+    char src_tot[60],dst_tot[60];
+    char dst_buffer[60]="",src_buffer[60]="";
     char *split;
-    //protocol_layout(protocol);
-    memcpy(gen_buffer, protocol, 5);
-    printf("%-6s", gen_buffer);
-    //sourceip_layout(src_ip);
-    if (RESOLVE) {
-        lookup_hostname(src_ip);}
-    if (!EXT_VIEW) {
-	memcpy(gen_buffer, src_ip, 24);
-	printf("%-25s", gen_buffer);
-    } else {
-	memcpy(gen_buffer, src_ip, 34);
-	printf("%-35s", gen_buffer);
-	}
-    //destip_layout(dst_ip);
-    if (RESOLVE) {
-        lookup_hostname(dst_ip);}
-    if (!EXT_VIEW) {
-	memcpy(gen_buffer, dst_ip, 24);
-	printf("%-25s", gen_buffer);
-    } else {
-	memcpy(gen_buffer, dst_ip, 34);
-	printf("%-35s", gen_buffer);
-	}
-    //port_layout(src_port, dst_port);
+    char src_port_b[10];
+    char dst_port_b[10];
+    char status_b[15];
+    char protocol_b[5];
+    char *token;
+    char *buff;
+    int src_port_s,dst_port_s,src_ip_s,dst_ip_s;
+    
+    //ports
     if ((match(src_port, "=")) && (match(dst_port, "="))) {
+	//source port
 	split = strtok(src_port,"=");
 	split = strtok(NULL,"=");
 	src_port = split;
-	// destination port
-	strncpy(ports, src_port, 5); 
+	strcpy(src_port_b,src_port);
+	if (RESOLVE)
+	    lookup_portname(src_port_b,protocol);
+	src_port_s = strlen(src_port_b);
+	//destination port
 	split = strtok(dst_port,"=");
 	split = strtok(NULL,"=");
 	dst_port = split;
-	// port layout
-	strcat(ports, "->");
-	strncat(ports, dst_port, 5); 
+	strcpy(dst_port_b,dst_port);
+	if (RESOLVE)
+	    lookup_portname(dst_port_b,protocol);
+	dst_port_s = strlen(dst_port_b);
 	}
-    printf("%-13s", ports);
-    // status layout
-    printf("%-10s", status);
-    printf("\n");
-    return(1);
+    //protocol
+    strncpy(protocol_b, protocol, 5);
+    printf("%-6s", protocol_b);
+    //source IP
+    if (strcmp(protocol_b,"icmp")!=0) {
+	if (RESOLVE) {
+    	    lookup_hostname(src_ip);}
+	if (!EXT_VIEW) {
+	    src_ip_s = 29 - src_port_s;
+	    strncpy(src_buffer, src_ip, src_ip_s);
+	    sprintf(src_tot,"%s:%s", src_buffer, src_port_b); 
+	    printf("%-31s", src_tot);
+	} else {
+	    src_ip_s = 39 - src_port_s;
+	    strncpy(src_buffer, src_ip, src_ip_s);
+	    sprintf(src_tot,"%s:%s", src_buffer, src_port_b); 
+	    printf("%-41s", src_tot);
+	    }
+	//destination IP
+	if (RESOLVE) {
+    	    lookup_hostname(dst_ip);}
+	if (!EXT_VIEW) {
+	    dst_ip_s = 29 - dst_port_s;
+	    strncpy(dst_buffer, dst_ip, dst_ip_s);
+	    sprintf(dst_tot,"%s:%s", dst_buffer, dst_port_b); 
+	    printf("%-31s", dst_tot);
+	} else {
+	    dst_ip_s = 39 - dst_port_s;
+	    strncpy(dst_buffer, dst_ip, dst_ip_s);
+	    sprintf(dst_tot,"%s:%s", dst_buffer, dst_port_b);
+	    printf("%-41s", dst_tot);
+	    }
+    } else {
+	if (RESOLVE) {
+    	    lookup_hostname(src_ip);}
+	if (!EXT_VIEW) {
+	    src_ip_s = 29;
+	    strncpy(src_buffer, src_ip, src_ip_s);
+	    sprintf(src_tot,"%s", src_buffer); 
+	    printf("%-31s", src_tot);
+	} else {
+	    src_ip_s = 39;
+	    strncpy(src_buffer, src_ip, src_ip_s);
+	    sprintf(src_tot,"%s", src_buffer); 
+	    printf("%-41s", src_tot);
+	    }
+	//destination IP
+	if (RESOLVE) {
+    	    lookup_hostname(dst_ip);}
+	if (!EXT_VIEW) {
+	    dst_ip_s = 29;
+	    strncpy(dst_buffer, dst_ip, dst_ip_s);
+	    sprintf(dst_tot,"%s", dst_buffer); 
+	    printf("%-31s", dst_tot);
+	} else {
+	    dst_ip_s = 39;
+	    strncpy(dst_buffer, dst_ip, dst_ip_s);
+	    sprintf(dst_tot,"%s", dst_buffer);
+	    printf("%-41s", dst_tot);
+	    }
+        }
+    //status
+    strcpy(status_b,status);
+    token = strtok(status_b,"[");
+    buff = token;
+    token = strtok(NULL,"[");
+    token = strtok(buff,"]");
+    buff = token;
+    token = strtok(NULL,"]");
+    printf("%s\n",buff);
     }
 
-int extract_ip(char *gen_buffer) 
+void lookup_portname(char *port, char *proto)
+    {
+    char *buf_portname;
+    char buf_port[10];
+    int portnr;
+    struct servent *service;
+    
+    strcpy(buf_port,port);
+    portnr = htons(atoi(buf_port));
+    if ((service = getservbyport(portnr, proto))) {
+	strcpy(port,service->s_name);
+	}
+    }
+
+void extract_ip(char *gen_buffer) 
     {
     char *split;
     split = strtok(gen_buffer,"=");
     split = strtok(NULL,"=");
     strcpy(gen_buffer,split);
-    return(1);
     }
 
 int lookup_hostname(char *r_host) 
@@ -484,7 +557,7 @@ int lookup_hostname(char *r_host)
     addr = inet_addr (r_host);
     hp=gethostbyaddr((char *) &addr, sizeof (addr), AF_INET);
     if (hp == NULL) {
-	return (0);
+	return 0;
 	}
 
     for (p = hp->h_addr_list; *p!=0;p++){
@@ -494,8 +567,9 @@ int lookup_hostname(char *r_host)
 	strcpy(r_host, "");
 	strcpy(r_host,hp->h_name);
 	}
-    return (0);
+    return 0;
     }
+
 
 int lookup_ip(char *hostname)
     {
@@ -510,7 +584,7 @@ int lookup_ip(char *hostname)
     ip_addr = *(struct in_addr *)(hp->h_addr);
     ip = inet_ntoa(*(struct in_addr *)(hp->h_addr));
     strcpy(hostname,ip);
-    return(1);
+    return 1;
     }
 
 int match(char *string, char *pattern) 
@@ -521,33 +595,47 @@ int match(char *string, char *pattern)
     i=regcomp(&re, pattern, REG_EXTENDED|REG_NOSUB);
     if (i != 0) {
 	(void)regerror(i,&re,buf,sizeof buf);
-	return(0);                       /* report error */
+	return 0;                       /* report error */
 	}
     i = regexec(&re, string, (size_t) 0, NULL, 0);
     regfree(&re);
     if (i != 0) {
 	(void)regerror(i,&re,buf,sizeof buf);
-	return(0);                       /* report error */
+	return 0;                       /* report error */
 	}
-    return(1);
+    return 1;
     }
 
 int check_if_source(char *host) 
     {
     if ((strcmp(host,SRC_IP)==0) || (strcmp(SRC_IP, "")==0)) {
-	return(1);
+	return 1;
 	}
-    return(0);
+    return 0;
     }
 
 int check_if_destination(char *host) 
     {
     if ((strcmp(host,DST_IP)==0) || (strcmp(DST_IP, "")==0)) {
-	return(1);
+	return 1;
 	}
-    return(0);
+    return 0;
     }
 
+void display_help()
+    {
+    printf("args: -h: displays this help\n");
+    printf("      -n: don't resolve host/portnames\n");
+    printf("      -p tcp | udp | icmp  : display connections by protocol\n");
+    printf("      -s <source-host>     : display connections by source\n");
+    printf("      -d <destination-host>: display connections by destination\n");
+    printf("      -S: display SNAT connections\n");
+    printf("      -D: display DNAT connections (default: SNAT & DNAT)\n"); 
+    printf("      -x: extended hostnames view\n");
+    printf("      -o: strip output header\n");
+    }
+
+    
 // -- End of internal used functions
 
 // -- The End --
