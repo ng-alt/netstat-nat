@@ -1,10 +1,10 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.7 2003/01/24 21:24:34 mardan Exp $     
+# $Id: netstat-nat.h,v 1.8 2003/08/31 10:59:15 mardan Exp $     
 #       
 #                                                                                                                  
-# Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
+# Copyright (c) 2002 by D.Wijsman (danny@tweegy.demon.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 #-------------------------------------------------------------------------------
 */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,9 +32,10 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <strings.h>
 
-
-#define VERSION		"1.4.2"
+#define VERSION		"1.4.3"
 #define ROWS		6
 
 
@@ -51,12 +51,17 @@ void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, c
 void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void extract_ip(char *gen_buffer);
 void display_help();
-int lookup_hostname(char *r_host);
-int lookup_ip(char *hostname);
+int lookup_hostname(char **r_host);
+int lookup_ip(char *hostname, size_t hostname_size);
 int match(char *string, char *pattern);
 int check_if_source(char *host);
 int check_if_destination(char *host);
-void lookup_portname(char *port,char *proto);
+void lookup_portname(char **port, char *proto);
 void oopsy(int size);
+static void *xrealloc(void *oldbuf, size_t newbufsize);
+static void *xcalloc(size_t bufsize);
+
+#define strcopy(dst, dst_size, src) \
+	strncpy(dst, src, (dst_size - 1)); 
 
 /* The End */

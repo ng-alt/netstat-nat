@@ -1,9 +1,9 @@
 Summary 	: netstat-nat displays NAT connections
 Name		: netstat-nat
-Version		: 1.4.2
+Version		: 1.4.3
 Release		: 1
 License		: GPL
-Packager	: Danny Wijsman <mardan@tweegy.demon.nl>
+Packager	: Danny Wijsman <danny@tweegy.demon.nl>
 URL		: http://tweegy.demon.nl/projects/netstat-nat/
 Group		: System Environment/firewall
 Source		: http://tweegy.demon.nl/download/%{name}-%{version}.tar.gz

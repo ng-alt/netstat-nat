@@ -1,8 +1,12 @@
-$Id: CHANGELOG,v 1.4 2003/02/09 17:26:11 mardan Exp $
+$Id: CHANGELOG,v 1.5 2003/08/31 11:01:39 mardan Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.3 
+- Memory allocation operations and copiing of variables have been made saver. 
+- Changed my e-mail to danny@tweegy.demon.nl 
+
 version: 1.4.2
 - Fixed hussle up displayed states when sorting 
 - Added support to display unknown protocols (displayed as 'raw')

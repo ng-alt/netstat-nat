@@ -1,9 +1,9 @@
 #-------------------------------------------------------------------------------
 #
-# $Id: Makefile,v 1.7 2003/02/08 17:41:44 mardan Exp $ 
+# $Id: Makefile,v 1.8 2003/08/31 10:59:15 mardan Exp $ 
 #
 #
-# Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
+# Copyright (c) 2002 by D.Wijsman (danny@tweegy.demon.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,7 @@
 #
 #-------------------------------------------------------------------------------
 
-VERSION = 1.4.2
+VERSION = 1.4.3
 SHELL = /bin/sh
 BINDIR = /usr/bin
 ETCDIR = /etc
