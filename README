@@ -1,10 +1,13 @@
-$Id: README,v 1.1 2002/06/30 19:55:41 mardan Exp $
+$Id: README,v 1.2 2002/07/07 20:27:46 mardan Exp $
 
 
 Description:
 -----------------------------------------------------------
-Netstat-nat displays NATed connections when using iptables.
-(http://netfilter.samba.org/)
+Netstat-nat is a small program written in C. It displays 
+NATed connections, created by netfilter/iptables from the 
+>2.4.x linux kernel. The program reads its information from 
+'/proc/net/ip_conntrack', which is the temporary conntrack-
+storage from netfilter. (http://netfilter.samba.org/)
 
 -----------------------------------------------------------
 
@@ -25,12 +28,21 @@ netstat-nat -n		: displays NATed connections
 netstat-nat -p tcp | udp | icmp
 			: diplays NATed connections with
 			  protocol selection.
-			  
+netstat-nat -s <source-host> :prints only connections by 
+			      NATed IP/hostname
 -----------------------------------------------------------
 
 
-Author:
+Homepage:
+-----------------------------------------------------------
+http://tweegy.demon.nl/projects/netstat-nat/
+
+-----------------------------------------------------------
+
+
+Contact:
 -----------------------------------------------------------
 D.Wijsman mardan@tweegy.demon.nl
 
 -----------------------------------------------------------
+

@@ -1,9 +1,14 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.7 2002/06/30 19:55:41 mardan Exp $     
+# $Id: netstat-nat.c,v 1.8 2002/07/07 20:27:47 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.8  2002/07/07 20:27:47  mardan
+# Added display by source host/IP.
+# Made a few fixes/changes.
+# Updated the REAMDE.
+#
 # Revision 1.7  2002/06/30 19:55:41  mardan
 # Added README and COPYING (license) FILES.
 #
@@ -57,27 +62,28 @@
 */
 
 #include <stdio.h>
-#include <sys/types.h>
 #include <string.h>
 #include <regex.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
+//#include <sys/types.h>
 //#include <errno.h>
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.7 2002/06/30 19:55:41 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.8 2002/07/07 20:27:47 mardan Exp $";
 static char const rcsname[] = "$Author: mardan $";
 static int RESOLVE;
-static char PROTOCOL[] = "";
-
+static char PROTOCOL[4] = "";
+static char SRC_IP[15] = "";
 
 int main(argc, argv)
 int argc;
 char *argv[];
     {
     int c;
-    const char *args = "h,n,p:proto";
-    int  ret;
+    const char *args = "hnp:s:";
+    int ret;
     int argerr;
     FILE *f;
     char line[200];
@@ -89,12 +95,17 @@ char *argv[];
 	    printf("args: -h: prints this help\n");
 	    printf("      -n: don't resolve IPs\n");
 	    printf("      -p tcp | udp | icmp: prints only selected protocol\n");
+	    printf("      -s <source-host>: prints only connections by NATed IP/hostname\n");
 	    return 1;
 	case 'n':
 	    RESOLVE = 0;
 	    break;
 	case 'p':
 	    strcpy (PROTOCOL, optarg);
+	    break;
+	case 's':
+	    strcpy (SRC_IP, optarg);
+	    lookup_ip(SRC_IP);
 	    break;
 	}
     }
@@ -177,25 +188,26 @@ int protocol_tcp(char *line)
 	buf[8]="";
 	buf[9]="";
 	}
-    		
     if ((!strcmp(buf[4],buf[9])==0) && (strcmp(buf[5],buf[8])==0)) {		
-	// protocol
-	strcpy(gen_buffer, buf[0]);
-	protocol_layout(gen_buffer);
-	// source host
-	strcpy(gen_buffer, buf[4]);
-	sourceip_layout(gen_buffer);
-	// destination host
-	strcpy(gen_buffer, buf[5]);
-	destip_layout(gen_buffer);
-	//port_layout
-	strcpy(src_port, buf[6]);
-	strcpy(dst_port, buf[10]);
-	port_layout(src_port, dst_port);
-	// connection status
-	printf("%-10s", buf[3]);
-	// EOL
-	printf("\n");
+	if (check_if_source(buf[4])) {
+	    // protocol
+	    strcpy(gen_buffer, buf[0]);
+	    protocol_layout(gen_buffer);
+	    // source host
+	    strcpy(gen_buffer, buf[4]);
+	    sourceip_layout(gen_buffer);
+	    // destination host
+	    strcpy(gen_buffer, buf[5]);
+	    destip_layout(gen_buffer);
+	    //port_layout
+	    strcpy(src_port, buf[6]);
+	    strcpy(dst_port, buf[10]);
+	    port_layout(src_port, dst_port);
+	    // connection status
+	    printf("%-10s", buf[3]);
+	    // EOL
+	    printf("\n");
+	    }
 	}
     }
 
@@ -234,23 +246,25 @@ int protocol_udp(char *line) {
         }
     
     if ((!strcmp(buf[2],buf[7])==0) && (strcmp(buf[3],buf[6])==0)) {	
-	// protocol
-	strcpy(gen_buffer, buf[0]);
-	protocol_layout(gen_buffer);
-	// source host
-	strcpy(gen_buffer, buf[2]);
-	sourceip_layout(gen_buffer);
-	// destination host
-	strcpy(gen_buffer, buf[6]);
-	destip_layout(gen_buffer);
-	//port_layout
-	strcpy(src_port, buf[4]);
-	strcpy(dst_port, buf[5]);
-	port_layout(src_port, dst_port);
-	// connection status
-	printf("%-10s", " ");
-	// EOL
-	printf("\n");	    
+	if (check_if_source(buf[2])) {
+	    // protocol
+	    strcpy(gen_buffer, buf[0]);
+	    protocol_layout(gen_buffer);
+	    // source host
+	    strcpy(gen_buffer, buf[2]);
+	    sourceip_layout(gen_buffer);
+	    // destination host
+	    strcpy(gen_buffer, buf[6]);
+	    destip_layout(gen_buffer);
+	    //port_layout
+	    strcpy(src_port, buf[4]);
+	    strcpy(dst_port, buf[5]);
+	    port_layout(src_port, dst_port);
+	    // connection status
+	    printf("%-10s", " ");
+	    // EOL
+	    printf("\n");	    
+	    }
 	}    
     }
 
@@ -289,23 +303,25 @@ int protocol_udp_ass(char *line) {
         }
     
     if ((!strcmp(buf[3],buf[8])==0) && (strcmp(buf[4],buf[7])==0)) {	
-	// protocol
-	strcpy(gen_buffer, buf[0]);
-	protocol_layout(gen_buffer);
-	// source host
-	strcpy(gen_buffer, buf[3]);
-	sourceip_layout(gen_buffer);
-	// destination host
-	strcpy(gen_buffer, buf[7]);
-	destip_layout(gen_buffer);
-	//port_layout
-	strcpy(src_port, buf[5]);
-	strcpy(dst_port, buf[6]);
-	port_layout(src_port, dst_port);
-	// connection status
-	printf("%-10s", buf[11]);
-	// EOL
-	printf("\n");	    
+	if (check_if_source(buf[3])) {
+	    // protocol
+	    strcpy(gen_buffer, buf[0]);
+	    protocol_layout(gen_buffer);
+	    // source host
+	    strcpy(gen_buffer, buf[3]);
+	    sourceip_layout(gen_buffer);
+	    // destination host
+	    strcpy(gen_buffer, buf[7]);
+	    destip_layout(gen_buffer);
+	    //port_layout
+	    strcpy(src_port, buf[5]);
+	    strcpy(dst_port, buf[6]);
+	    port_layout(src_port, dst_port);
+	    // connection status
+	    printf("%-10s", buf[11]);
+	    // EOL
+	    printf("\n");	    
+	    }
 	}    
     }
 
@@ -344,23 +360,25 @@ int protocol_udp_unr(char *line) {
         }
     
     if ((!strcmp(buf[3],buf[9])==0) && (strcmp(buf[4],buf[8])==0)) {	
-	// protocol
-	strcpy(gen_buffer, buf[0]);
-	protocol_layout(gen_buffer);
-	// source host
-	strcpy(gen_buffer, buf[3]);
-	sourceip_layout(gen_buffer);
-	// destination host
-	strcpy(gen_buffer, buf[8]);
-	destip_layout(gen_buffer);
-	//port_layout
-	strcpy(src_port, buf[5]);
-	strcpy(dst_port, buf[6]);
-	port_layout(src_port, dst_port);
-	// connection status
-	printf("%-10s", buf[7]);
-	// EOL
-	printf("\n");	    
+	if (check_if_source(buf[3])) {
+	    // protocol
+	    strcpy(gen_buffer, buf[0]);
+	    protocol_layout(gen_buffer);
+	    // source host
+	    strcpy(gen_buffer, buf[3]);
+	    sourceip_layout(gen_buffer);
+	    // destination host
+	    strcpy(gen_buffer, buf[8]);
+	    destip_layout(gen_buffer);
+	    //port_layout
+	    strcpy(src_port, buf[5]);
+	    strcpy(dst_port, buf[6]);
+	    port_layout(src_port, dst_port);
+	    // connection status
+	    printf("%-10s", buf[7]);
+	    // EOL
+	    printf("\n");	    
+	    }
 	}    
     }
 
@@ -399,22 +417,24 @@ int protocol_icmp_unr(char *line) {
         }
     
     if ((!strcmp(buf[3],buf[10])==0) && (strcmp(buf[4],buf[9])==0)) {	
-        // protocol
-        strcpy(gen_buffer, buf[0]);
-        protocol_layout(gen_buffer);
-        // source host
-        strcpy(gen_buffer, buf[3]);
-        sourceip_layout(gen_buffer);
-        // destination host
-        strcpy(gen_buffer, buf[4]);
-        destip_layout(gen_buffer);
-        // port layout
-        printf("%-13s"," ");
-        // connection status
-        printf("%-10s", buf[8]);
-        // EOL
-        printf("\n");	    
-        }    
+        if (check_if_source(buf[3])) {
+	    // protocol
+    	    strcpy(gen_buffer, buf[0]);
+    	    protocol_layout(gen_buffer);
+	    // source host
+    	    strcpy(gen_buffer, buf[3]);
+    	    sourceip_layout(gen_buffer);
+    	    // destination host
+    	    strcpy(gen_buffer, buf[4]);
+    	    destip_layout(gen_buffer);
+    	    // port layout
+    	    printf("%-13s"," ");
+    	    // connection status
+    	    printf("%-10s", buf[8]);
+    	    // EOL
+    	    printf("\n");	    
+    	    }
+	}    
     }
 
 int protocol_icmp_rep(char *line) {
@@ -449,21 +469,23 @@ int protocol_icmp_rep(char *line) {
 	}
 	
     if ((!strcmp(buf[3],buf[9])==0) && (strcmp(buf[4],buf[8])==0)) {	
-	// protocol
-	strcpy(gen_buffer, buf[0]);
-	protocol_layout(gen_buffer);
-	// source host
-	strcpy(gen_buffer, buf[3]);
-	sourceip_layout(gen_buffer);
-	// destination host
-	strcpy(gen_buffer, buf[4]);
-	destip_layout(gen_buffer);
-	// port layout
-	printf("%-13s"," ");
-	// connection status
-	printf("%-10s", "[REPLIED]");
-	// EOL
-	printf("\n");	    
+	if (check_if_source(buf[3])) {
+	    // protocol
+	    strcpy(gen_buffer, buf[0]);
+	    protocol_layout(gen_buffer);
+	    // source host
+	    strcpy(gen_buffer, buf[3]);
+	    sourceip_layout(gen_buffer);
+	    // destination host
+	    strcpy(gen_buffer, buf[4]);
+	    destip_layout(gen_buffer);
+	    // port layout
+	    printf("%-13s"," ");
+	    // connection status
+	    printf("%-10s", "[REPLIED]");
+	    // EOL
+	    printf("\n");	    
+	    }
 	}
     }
 // -- End of NATed protocols
@@ -542,6 +564,23 @@ int lookup_hostname(char *r_host) {
     }
 
 
+int lookup_ip(char *hostname)
+    {
+    char *ip;
+    struct hostent *hp;
+    struct in_addr ip_addr;
+    hp = gethostbyname(hostname);
+    if(!hp) {
+	printf("Unknown host: %s\n",hostname);
+	exit(-1);
+	}
+    ip_addr = *(struct in_addr *)(hp->h_addr);
+    ip = inet_ntoa(*(struct in_addr *)(hp->h_addr));
+    strcpy(hostname,ip);
+    return(1);
+    }
+
+
 int match(char *string, char *pattern) {
     int i;
     regex_t re;
@@ -561,6 +600,14 @@ int match(char *string, char *pattern) {
 	}
     return(1);
     }
+
+int check_if_source(char *host) {
+    if ((strcmp(host,SRC_IP)==0) || (strcmp(SRC_IP, "")==0)) {
+	return(1);
+	}
+    return(0);
+    }
+    
 // -- End of internal used functions
 
 // -- The End --
