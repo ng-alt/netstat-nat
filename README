@@ -1,4 +1,4 @@
-$Id: README,v 1.6 2002/08/06 19:32:54 mardan Exp $
+$Id: README,v 1.8 2002/09/12 19:32:12 mardan Exp $
 
 
 Description:
@@ -35,7 +35,10 @@ netstat-nat -d <dest-host>	: display connections by destination IP/hostname
 netstat-nat -S			: display SNAT connections
 netstat-nat -D			: display DNAT connections
 				  (default: both) 
+netstat-nat -L			: display only connections to NAT box self 
+				  (disables SNAT & DNAT) 
 netstat-nat -x 			: extend the view of the hostnames
+netstat-nat -r src|dst|src-port|dst-port|state : sort connections 
 netstat-nat -o			: strip output header
 -------------------------------------------------------------------------------
 
@@ -61,8 +64,8 @@ README
 
 Thanks:
 -------------------------------------------------------------------------------
-Marceln for writing the man-page and making a .rpm and a src.rpm, which can be
-downloaded at his page.
+Marceln for writing the man-page and making the v1.2 .rpm and src.rpm, which can 
+be downloaded at his page.
 http://http://www.xs4all.nl/~marceln/rpm/
 
 -------------------------------------------------------------------------------

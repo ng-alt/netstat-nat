@@ -1,9 +1,18 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.15 2002/08/07 19:25:59 mardan Exp $     
+# $Id: netstat-nat.c,v 1.17 2002/09/12 19:32:12 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.17  2002/09/12 19:32:12  mardan
+# Added display local connections to NAT box self
+# Updated README
+# Small changes in Makefile
+#
+# Revision 1.16  2002/09/08 20:23:48  mardan
+# Added sort by connection option. (source/destination IP/port)
+# Updated README and man-page.
+#
 # Revision 1.15  2002/08/07 19:25:59  mardan
 # Fixed bug, displayed wrong icmp connection in state REPLIED (dest was gateway).
 #
@@ -99,23 +108,34 @@
 #include "netstat-nat.h"
 
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.15 2002/08/07 19:25:59 mardan Exp $";
-int RESOLVE = 1;
-char PROTOCOL[4] = "";
-char SRC_IP[35] = "";
-char DST_IP[35] = "";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.17 2002/09/12 19:32:12 mardan Exp $";
+char SRC_IP[35];
+char DST_IP[35];
 int SNAT = 1;
 int DNAT = 1;
-int EXT_VIEW = 0;
+int LOCAL = 0;
+char connection_table[MAX_CONN][ROWS][ROW_SIZE];
+int connection_index = 0;
 
 
 int main(int argc, char *argv[])
     {
-    const char *args = "hnp:s:d:SDxo";
-    int c;
-    int no_hdr = 0;
+    const char *args = "hnp:s:d:SDxor:L";
+    static int SORT_ROW = 1;
+    static int EXT_VIEW = 0;
+    static int RESOLVE = 1;
+    static int no_hdr = 0;
+    static char PROTOCOL[4];
     FILE *f;
     char line[200];
+    char src[50];
+    char dst[50];
+    char buf[100];
+    char buf2[100];
+    
+    char *pa[MAX_CONN][ROWS];
+    char *store;
+    int index,a,b,c,j,r;
     
     // check parameters
     while ((c = getopt(argc, argv, args)) != -1 ) {
@@ -146,12 +166,28 @@ int main(int argc, char *argv[])
 	case 'D':
 	    SNAT = 0;
 	    break;
+	case 'L':
+	    SNAT = 0;
+	    DNAT = 0;
+	    LOCAL = 1;
+	    break;
 	case 'x':
 	    EXT_VIEW = 1;
 	    break;
 	case 'o':
 	    no_hdr = 1;
 	    break;
+	case 'r':
+	    if (optarg == NULL || optarg == '\0') {
+		display_help();
+		return 1;
+		}
+	    if (strcmp(optarg, "scr") == 0) SORT_ROW = 1; //default
+	    if (strcmp(optarg, "dst") == 0) SORT_ROW = 2;
+	    if (strcmp(optarg, "src-port") == 0) SORT_ROW = 3; 
+	    if (strcmp(optarg, "dst-port") == 0) SORT_ROW = 4; 
+	    if (strcmp(optarg, "state") == 0) SORT_ROW = 5;
+	    break; 
 	}
     }
     
@@ -170,7 +206,9 @@ int main(int argc, char *argv[])
 	    printf("%-6s%-41s%-41s%-6s\n","Proto","NATed Address","Foreign Address","State");
 	    }
 	}
-    while (fgets(line,1000,f)!=NULL) {
+
+    while (fgets(line,1000,f)!=NULL) 
+	{
 	if ((!strcmp(PROTOCOL, "tcp")) || (!strcmp(PROTOCOL, ""))) {
 	    if(match(line, "tcp")) {
 		protocol_tcp(line);
@@ -199,7 +237,67 @@ int main(int argc, char *argv[])
 	    }
 	}
     fclose(f);
-    return 0;
+    
+    // create array pointed to main connection array
+    for (index = 0; index < connection_index; index++)	{
+	for (j=0; j<ROWS; j++) {
+	    pa[index][j] = &connection_table[index][j][0];
+	    }
+	}
+    // sort by protocol and defined row
+    for (a = 0;a < connection_index-1; a++) {
+	for (b = a+1; b < connection_index; b++) {
+	    r = strcmp(pa[a][0], pa[b][0]);
+	    if (r > 0) {
+		for (j=0;j<ROWS-1;j++) {
+		    store = pa[a][j];
+		    pa[a][j] = pa[b][j];
+		    pa[b][j] = store;
+		    }
+		}	    
+	    if (r == 0) {
+		if (strcmp(pa[a][SORT_ROW], pa[b][SORT_ROW]) > 0) {
+		    for (j=0;j<ROWS;j++) {
+			store = pa[a][j];
+			pa[a][j] = pa[b][j];
+			pa[b][j] = store;
+			}
+		    }
+		}
+	    }
+	}
+    // print connections
+    for (index = 0; index < connection_index; index++) {  
+	if (RESOLVE) {
+	    lookup_hostname(pa[index][1]);
+	    lookup_hostname(pa[index][2]);
+	    if (strlen(pa[index][3]) > 0 || strlen(pa[index][4]) > 0) {
+		lookup_portname(pa[index][3], pa[index][0]);
+		lookup_portname(pa[index][4], pa[index][0]);
+	    	}
+	    }
+	if (!EXT_VIEW) {
+	    strcpy(buf ,""); 
+	    strncat(buf, pa[index][1], 29 - strlen(pa[index][3]));    
+	    sprintf(buf2, "%s:%s", buf, pa[index][3]);
+	    sprintf(src , "%-31s", buf2);
+	    strcpy(buf ,""); 
+	    strncat(buf, pa[index][2], 29 - strlen(pa[index][4]));    
+	    sprintf(buf2, "%s:%s", buf, pa[index][4]);
+	    sprintf(dst , "%-31s", buf2);
+	} else {
+	    strcpy(buf ,""); 
+	    strncat(buf, pa[index][1], 39 - strlen(pa[index][3]));    
+	    sprintf(buf2, "%s:%s", buf, pa[index][3]);
+	    sprintf(src , "%-41s", buf2);
+	    strcpy(buf ,""); 
+	    strncat(buf, pa[index][2], 39 - strlen(pa[index][4]));    
+	    sprintf(buf2, "%s:%s", buf, pa[index][4]);
+	    sprintf(dst , "%-41s", buf2);
+	    }
+	printf("%-6s%s%s%-11s\n", pa[index][0], src, dst, pa[index][5]);
+	}
+    return(0);
     }
 
 // -- NATed protocols
@@ -232,6 +330,11 @@ void protocol_tcp(char *line)
 	    }
 	if (DNAT) {
 	    if ((strcmp(buf[4],buf[9])==0) && (!strcmp(buf[5],buf[8])==0)) {		
+		check_src_dst(buf[0],buf[4],buf[8],buf[6],buf[7],buf[3]);
+		}
+	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[4],buf[9])==0) && (strcmp(buf[5],buf[8])==0)) {		
 		check_src_dst(buf[0],buf[4],buf[8],buf[6],buf[7],buf[3]);
 		}
 	    }
@@ -269,6 +372,12 @@ void protocol_udp(char *line)
 		check_src_dst(buf[0],buf[2],buf[6],buf[4],buf[5]," ");
 		}    
 	    }	
+	if (LOCAL) {
+	    if ((strcmp(buf[2],buf[7])==0) && (strcmp(buf[3],buf[6])==0)) {	
+		check_src_dst(buf[0],buf[2],buf[6],buf[4],buf[5]," ");
+		}    
+	    }	
+	
 	}
     }
 
@@ -302,6 +411,11 @@ void protocol_udp_ass(char *line)
 		check_src_dst(buf[0],buf[3],buf[7],buf[5],buf[6],buf[11]);
 		}    
 	    }
+	if(LOCAL) {
+	    if ((strcmp(buf[3],buf[8])==0) && (strcmp(buf[4],buf[7])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[7],buf[5],buf[6],buf[11]);
+		}    
+	    }
 	}
     }
 
@@ -332,6 +446,11 @@ void protocol_udp_unr(char *line)
 	    }
 	if (DNAT) {
 	    if ((strcmp(buf[3],buf[9])==0) && (!strcmp(buf[4],buf[8])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[8],buf[5],buf[6],buf[7]);
+		}    
+	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[3],buf[9])==0) && (strcmp(buf[4],buf[8])==0)) {	
 		check_src_dst(buf[0],buf[3],buf[8],buf[5],buf[6],buf[7]);
 		}    
 	    }
@@ -369,6 +488,11 @@ void protocol_icmp_unr(char *line)
     		check_src_dst(buf[0],buf[3],buf[9]," "," ",buf[8]);
 		}    
 	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[3],buf[10])==0) && (strcmp(buf[4],buf[9])==0)) {	
+    		check_src_dst(buf[0],buf[3],buf[9]," "," ",buf[8]);
+		}    
+	    }
 	}
     }
 
@@ -402,6 +526,11 @@ void protocol_icmp_rep(char *line)
 		check_src_dst(buf[0],buf[3],buf[8]," "," ","REPLIED");
 		}
 	    }
+	if (LOCAL) {
+	    if ((strcmp(buf[3],buf[9])==0) && (strcmp(buf[4],buf[8])==0)) {	
+		check_src_dst(buf[0],buf[3],buf[8]," "," ","REPLIED");
+		}
+	    }
 	}
     }
     
@@ -412,28 +541,24 @@ void protocol_icmp_rep(char *line)
 void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status) 
     {
     if ((check_if_source(src_ip)) && (strcmp(DST_IP,"")==0)) {
-	print_connection(protocol,src_ip,dst_ip,src_port,dst_port,status);
+	store_data(protocol,src_ip,dst_ip,src_port,dst_port,status);
 	}
     else if ((check_if_destination(dst_ip)) && (strcmp(SRC_IP,"")==0)) {
-	print_connection(protocol,src_ip,dst_ip,src_port,dst_port,status);
+	store_data(protocol,src_ip,dst_ip,src_port,dst_port,status);
 	}
     else if ((check_if_destination(dst_ip)) && (check_if_source(src_ip))) {
-	print_connection(protocol,src_ip,dst_ip,src_port,dst_port,status);
+	store_data(protocol,src_ip,dst_ip,src_port,dst_port,status);
 	}
     }
 
-void print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
+void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
     {
-    char src_tot[60],dst_tot[60];
-    char dst_buffer[60]="",src_buffer[60]="";
     char *split;
-    char src_port_b[10];
-    char dst_port_b[10];
     char status_b[15];
     char protocol_b[5];
     char *token;
     char *buff;
-    int src_port_s,dst_port_s,src_ip_s,dst_ip_s;
+    char msg[50];
     
     //ports
     if ((match(src_port, "=")) && (match(dst_port, "="))) {
@@ -441,79 +566,23 @@ void print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port
 	split = strtok(src_port,"=");
 	split = strtok(NULL,"=");
 	src_port = split;
-	strcpy(src_port_b,src_port);
-	if (RESOLVE)
-	    lookup_portname(src_port_b,protocol);
-	src_port_s = strlen(src_port_b);
+	strcpy(connection_table[connection_index][3], src_port);
 	//destination port
 	split = strtok(dst_port,"=");
 	split = strtok(NULL,"=");
 	dst_port = split;
-	strcpy(dst_port_b,dst_port);
-	if (RESOLVE)
-	    lookup_portname(dst_port_b,protocol);
-	dst_port_s = strlen(dst_port_b);
+	strcpy(connection_table[connection_index][4], dst_port);
 	}
     //protocol
     strncpy(protocol_b, protocol, 5);
-    printf("%-6s", protocol_b);
-    //source IP
+    strcpy(connection_table[connection_index][0], protocol);
+    //IP
     if (strcmp(protocol_b,"icmp")!=0) {
-	if (RESOLVE) {
-    	    lookup_hostname(src_ip);}
-	if (!EXT_VIEW) {
-	    src_ip_s = 29 - src_port_s;
-	    strncpy(src_buffer, src_ip, src_ip_s);
-	    sprintf(src_tot,"%s:%s", src_buffer, src_port_b); 
-	    printf("%-31s", src_tot);
-	} else {
-	    src_ip_s = 39 - src_port_s;
-	    strncpy(src_buffer, src_ip, src_ip_s);
-	    sprintf(src_tot,"%s:%s", src_buffer, src_port_b); 
-	    printf("%-41s", src_tot);
-	    }
-	//destination IP
-	if (RESOLVE) {
-    	    lookup_hostname(dst_ip);}
-	if (!EXT_VIEW) {
-	    dst_ip_s = 29 - dst_port_s;
-	    strncpy(dst_buffer, dst_ip, dst_ip_s);
-	    sprintf(dst_tot,"%s:%s", dst_buffer, dst_port_b); 
-	    printf("%-31s", dst_tot);
-	} else {
-	    dst_ip_s = 39 - dst_port_s;
-	    strncpy(dst_buffer, dst_ip, dst_ip_s);
-	    sprintf(dst_tot,"%s:%s", dst_buffer, dst_port_b);
-	    printf("%-41s", dst_tot);
-	    }
+	strcpy(connection_table[connection_index][1], src_ip);
+	strcpy(connection_table[connection_index][2], dst_ip);
     } else {
-	if (RESOLVE) {
-    	    lookup_hostname(src_ip);}
-	if (!EXT_VIEW) {
-	    src_ip_s = 29;
-	    strncpy(src_buffer, src_ip, src_ip_s);
-	    sprintf(src_tot,"%s", src_buffer); 
-	    printf("%-31s", src_tot);
-	} else {
-	    src_ip_s = 39;
-	    strncpy(src_buffer, src_ip, src_ip_s);
-	    sprintf(src_tot,"%s", src_buffer); 
-	    printf("%-41s", src_tot);
-	    }
-	//destination IP
-	if (RESOLVE) {
-    	    lookup_hostname(dst_ip);}
-	if (!EXT_VIEW) {
-	    dst_ip_s = 29;
-	    strncpy(dst_buffer, dst_ip, dst_ip_s);
-	    sprintf(dst_tot,"%s", dst_buffer); 
-	    printf("%-31s", dst_tot);
-	} else {
-	    dst_ip_s = 39;
-	    strncpy(dst_buffer, dst_ip, dst_ip_s);
-	    sprintf(dst_tot,"%s", dst_buffer);
-	    printf("%-41s", dst_tot);
-	    }
+	strcpy(connection_table[connection_index][1], src_ip);
+	strcpy(connection_table[connection_index][2], dst_ip);
         }
     //status
     strcpy(status_b,status);
@@ -523,7 +592,9 @@ void print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port
     token = strtok(buff,"]");
     buff = token;
     token = strtok(NULL,"]");
-    printf("%s\n",buff);
+    sprintf(msg, "%s",buff);
+    strcpy(connection_table[connection_index][5], msg);
+    connection_index++;
     }
 
 void lookup_portname(char *port, char *proto)
@@ -630,8 +701,10 @@ void display_help()
     printf("      -s <source-host>     : display connections by source\n");
     printf("      -d <destination-host>: display connections by destination\n");
     printf("      -S: display SNAT connections\n");
-    printf("      -D: display DNAT connections (default: SNAT & DNAT)\n"); 
+    printf("      -D: display DNAT connections (default: SNAT & DNAT)\n");
+    printf("      -L: display only connections to NAT box self (disables SNAT & DNAT)\n"); 
     printf("      -x: extended hostnames view\n");
+    printf("      -r src | dst | src-port | dst-port | state : sort connections\n");
     printf("      -o: strip output header\n");
     }
 

@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.2 2002/08/06 19:32:54 mardan Exp $     
+# $Id: netstat-nat.h,v 1.3 2002/09/08 20:23:48 mardan Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
@@ -35,6 +35,11 @@
 #include <arpa/inet.h>
 
 
+#define MAX_CONN 	2048	/* maximum connections in array */
+#define ROWS		6
+#define ROW_SIZE	70
+
+
 void protocol_tcp(char *line);
 void protocol_udp(char *line);
 void protocol_udp_ass(char *line);
@@ -42,7 +47,7 @@ void protocol_udp_unr(char *line);
 void protocol_icmp_unr(char *line);
 void protocol_icmp_rep(char *line);
 void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
-void print_connection(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
+void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
 void extract_ip(char *gen_buffer);
 void display_help();
 int lookup_hostname(char *r_host);
