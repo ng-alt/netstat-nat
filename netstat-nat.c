@@ -1,9 +1,18 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.25 2005/01/01 17:02:24 mardan Exp $     
+# $Id: netstat-nat.c,v 1.28 2005/01/29 15:24:37 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.28  2005/01/29 15:24:37  mardan
+# Some cleanups, bumped to version 1.4.5
+#
+# Revision 1.27  2005/01/23 16:33:09  mardan
+# Added protocol resolving
+#
+# Revision 1.26  2005/01/21 22:54:14  mardan
+# Added some forgotten states
+#
 # Revision 1.25  2005/01/01 17:02:24  mardan
 # Extraction of IPs and ports more dynamicly so it can be used with layer7 and
 # maybe others when layout of ip_conntrack changes
@@ -120,7 +129,7 @@
 #
 #
 #                                                                                                                  
-# Copyright (c) 2002 by D.Wijsman (danny@tweegy.demon.nl). 
+# Copyright (c) 2005 by D.Wijsman (danny@tweegy.demon.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -143,7 +152,7 @@
 
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.25 2005/01/01 17:02:24 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.28 2005/01/29 15:24:37 mardan Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
@@ -236,7 +245,7 @@ int main(int argc, char *argv[])
     
     // some checking for IPTables and read file
     if ((f = fopen("/proc/net/ip_conntrack","r")) == NULL) {
-//    if ((f = fopen("./conntrack.dump2","r")) == NULL) {
+//    if ((f = fopen("./conntrack.dump","r")) == NULL) {
 	printf("Could not read info about connections from the kernel, make sure netfilter is enabled in kernel or by modules.\n");
 	return 1;
 	}
@@ -312,39 +321,39 @@ int main(int argc, char *argv[])
 	if (!EXT_VIEW) {
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][1], 29 - strlen(pa[index][3]));    
-	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
-                snprintf(buf2, sizeof(buf2), "%s", buf);
+	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);            
 	    }
             else {
-                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);            
+                snprintf(buf2, sizeof(buf2), "%s", buf);
             }
             snprintf(src, sizeof(src),  "%-31s", buf2);
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][2], 29 - strlen(pa[index][4]));    
-	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
-	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);            
 	    }
             else {
-                snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);            
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
             }
 	    snprintf(dst, sizeof(dst), "%-31s", buf2);
 	} else {
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][1], 39 - strlen(pa[index][3]));    
-	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
-	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);
 	    }
             else {
-	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
 	    }
             snprintf(src , sizeof(src), "%-41s", buf2);
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][2], 39 - strlen(pa[index][4]));    
-	    if (!strcmp(pa[index][0], "raw") || !strcmp(pa[index][0], "icmp")) {
-	        snprintf(buf2, sizeof(buf2), "%s", buf);
+	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);
 	    }
             else {
-	        snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);
+	        snprintf(buf2, sizeof(buf2), "%s", buf);
 	    }
             snprintf(dst, sizeof(dst), "%-41s", buf2);
 	    }
@@ -356,6 +365,10 @@ int main(int argc, char *argv[])
 // get protocol
 int get_protocol(char *line, char *protocol)
 {
+    int i,j, protocol_nr;
+    char protocol_name[10] = "";
+    char protocol_raw[5] = "";
+    
     if (string_search(line, "tcp")) {
         memcpy(protocol, "tcp", 3);
     }
@@ -366,7 +379,23 @@ int get_protocol(char *line, char *protocol)
         memcpy(protocol, "icmp", 4);
     }
     else {
-        memcpy(protocol, "raw", 3);
+        // here we search for protocol number and give it a name (get_protocol_name)
+        for (i = 0; i < strlen(line); i++ ) {
+            if(!strncmp(&line[i], "unknown  ", 9)) {
+                i += 9;
+                for (j = i; j < strlen(line); j++) {
+                    if (line[j] == ' ') {
+                        break;
+                    }
+                    strncat(protocol_raw, &line[j], 1);
+                }
+                protocol_nr = atoi(protocol_raw);
+                get_protocol_name(protocol_name, protocol_nr);
+                memcpy(protocol, protocol_name, 9);
+                break;
+            }
+        }
+        //memcpy(protocol, "raw", 3);
     }
 //    printf("PROTO: %s\n", protocol);
     return(0);
@@ -380,6 +409,15 @@ int get_connection_state(char *line, char *state)
     }
     else if (string_search(line, "TIME_WAIT")) {
         memcpy(state, "TIME_WAIT", 9);
+    }    
+    else if (string_search(line, "FIN_WAIT")) {
+        memcpy(state, "FIN_WAIT", 8);
+    }    
+    else if (string_search(line, "SYN_RECV")) {
+        memcpy(state, "SYN_RECV", 8);
+    }    
+    else if (string_search(line, "SYN_SENT")) {
+        memcpy(state, "SYN_SENT", 8);
     }    
     else if (string_search(line, "UNREPLIED")) {
         memcpy(state, "UNREPLIED", 9);
@@ -699,11 +737,26 @@ int search_sec_hit(char *search, char *line, char *ret)
 }
 
 
+void get_protocol_name(char *protocol_name, int protocol_nr)
+{
+    struct protoent *proto_struct;
+    char strconvers[10] = "";
+    proto_struct = getprotobynumber(protocol_nr);
+    if (proto_struct != NULL) {
+        memcpy(protocol_name, proto_struct->p_name, 5);
+    }
+    else {
+        snprintf(strconvers, 6, "%d", protocol_nr);
+        memcpy(protocol_name, strconvers, 5);
+    }
+}
+
+
 void display_help()
     {
     printf("args: -h: displays this help\n");
     printf("      -n: don't resolve host/portnames\n");
-    printf("      -p tcp | udp | icmp  : display connections by protocol\n");
+    printf("      -p <protocol>        : display connections by protocol\n");
     printf("      -s <source-host>     : display connections by source\n");
     printf("      -d <destination-host>: display connections by destination\n");
     printf("      -S: display SNAT connections\n");

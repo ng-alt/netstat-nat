@@ -1,10 +1,10 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.9 2005/01/01 17:02:24 mardan Exp $     
+# $Id: netstat-nat.h,v 1.11 2005/01/29 15:24:37 mardan Exp $     
 #       
 #                                                                                                                  
-# Copyright (c) 2002 by D.Wijsman (danny@tweegy.demon.nl). 
+# Copyright (c) 2005 by D.Wijsman (danny@tweegy.demon.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -35,7 +35,7 @@
 #include <errno.h>
 #include <strings.h>
 
-#define VERSION		"1.4.4"
+//#define VERSION		"1.4.4"
 #define ROWS		6
 
 
@@ -55,6 +55,7 @@ void lookup_portname(char **port, char *proto);
 void oopsy(int size);
 static void *xrealloc(void *oldbuf, size_t newbufsize);
 static void *xcalloc(size_t bufsize);
+void get_protocol_name(char *protocol_name, int protocol_nr);
 
 #define strcopy(dst, dst_size, src) \
 	strncpy(dst, src, (dst_size - 1)); 

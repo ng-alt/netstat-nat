@@ -1,4 +1,4 @@
-$Id: INSTALL,v 1.1 2002/11/23 21:09:47 mardan Exp $
+$Id: INSTALL,v 1.2 2005/01/21 22:54:14 mardan Exp $
 
 
 Install:
@@ -8,6 +8,7 @@ Unpack the source if you haven't allready done that by typing
 Go into the directory by typing 'cd netstat-nat-x.y'
 and do the following: 
 
+'configure'
 'make'
 'make install'
 

@@ -1,8 +1,11 @@
-$Id: ChangeLog,v 1.1 2005/01/01 17:02:24 mardan Exp $
+$Id: ChangeLog,v 1.2 2005/01/29 15:24:37 mardan Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.5
+- Protocol resolving instead of 'raw'
+
 version: 1.4.4
 - Extraction of IPs and ports more dynamicly so it can be used with layer7 and 
   maybe others when layout of ip_conntrack changes
