@@ -1,43 +1,46 @@
-$Id: README,v 1.2 2002/07/07 20:27:46 mardan Exp $
+$Id: README,v 1.3 2002/07/12 20:05:54 mardan Exp $
 
 
 Description:
------------------------------------------------------------
-Netstat-nat is a small program written in C. It displays 
-NATed connections, created by netfilter/iptables from the 
->2.4.x linux kernel. The program reads its information from 
-'/proc/net/ip_conntrack', which is the temporary conntrack-
-storage from netfilter. (http://netfilter.samba.org/)
+-------------------------------------------------------------------------------
+Netstat-nat is a small program written in C. It displays NAT connections, 
+managed by netfilter/iptables which comes with the > 2.4.x linux kernels. The 
+program reads its information from '/proc/net/ip_conntrack', which is the 
+temporary conntrack-storage of netfilter. (http://netfilter.samba.org/)
+For any program options see sector 'Usage' section below.
 
------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 Compiling:
------------------------------------------------------------
+-------------------------------------------------------------------------------
 gcc netstat-nat.c -o netstat-nat
 strip netstat-nat
 
------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 Usage:
------------------------------------------------------------
-netstat-nat -h		: displays help
-netstat-nat -n		: displays NATed connections
-			  without hostname-resolving.
-netstat-nat -p tcp | udp | icmp
-			: diplays NATed connections with
-			  protocol selection.
-netstat-nat -s <source-host> :prints only connections by 
-			      NATed IP/hostname
------------------------------------------------------------
+-------------------------------------------------------------------------------
+netstat-nat -h			: displays help
+netstat-nat -n			: displays NAT connections without 
+				  hostname-resolving.
+netstat-nat -p tcp | udp | icmp	: diplays NAT connections with protocol 
+				  selection.
+netstat-nat -s <source-host>	: display connections by source IP/hostname
+netstat-nat -d <dest-host>	: display connections by destination IP/hostname
+netstat-nat -S			: display SNAT connections
+netstat-nat -D			: display DNAT connections
+				  (default: both) 
+netstat-nat -x 			: extend the view of the hostnames
+-------------------------------------------------------------------------------
 
 
 Homepage:
------------------------------------------------------------
+-------------------------------------------------------------------------------
 http://tweegy.demon.nl/projects/netstat-nat/
 
------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 Contact:
