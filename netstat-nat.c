@@ -1,9 +1,17 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.17 2002/09/12 19:32:12 mardan Exp $     
+# $Id: netstat-nat.c,v 1.19 2002/09/22 20:10:19 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.19  2002/09/22 20:10:19  mardan
+# Added '-v: print version'
+# Added 'uninstall' to Makefile
+# Updated all other files.
+#
+# Revision 1.18  2002/09/22 17:16:08  mardan
+# Rewritten connection_table to allocate memory dynamicly.
+#
 # Revision 1.17  2002/09/12 19:32:12  mardan
 # Added display local connections to NAT box self
 # Updated README
@@ -108,19 +116,19 @@
 #include "netstat-nat.h"
 
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.17 2002/09/12 19:32:12 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.19 2002/09/22 20:10:19 mardan Exp $";
 char SRC_IP[35];
 char DST_IP[35];
 int SNAT = 1;
 int DNAT = 1;
 int LOCAL = 0;
-char connection_table[MAX_CONN][ROWS][ROW_SIZE];
 int connection_index = 0;
+char ***connection_table;
 
 
 int main(int argc, char *argv[])
     {
-    const char *args = "hnp:s:d:SDxor:L";
+    const char *args = "hnp:s:d:SDxor:L?v";
     static int SORT_ROW = 1;
     static int EXT_VIEW = 0;
     static int RESOLVE = 1;
@@ -132,11 +140,15 @@ int main(int argc, char *argv[])
     char dst[50];
     char buf[100];
     char buf2[100];
+    char from[20] = "NATed Address";
+    char dest[20] = "Foreign Address";
     
-    char *pa[MAX_CONN][ROWS];
+    char ***pa;
     char *store;
     int index,a,b,c,j,r;
     
+    if ((connection_table = (char ***)malloc((1) *sizeof(char **))) == NULL)
+	(void)oopsy();
     // check parameters
     while ((c = getopt(argc, argv, args)) != -1 ) {
 	switch (c) {
@@ -146,6 +158,9 @@ int main(int argc, char *argv[])
 	case '?':
 	    display_help();
 	    return 1;
+	case 'v':
+	    printf("Version %s\n",VERSION);
+	    return(0);
 	case 'n':
 	    RESOLVE = 0;
 	    break;
@@ -200,11 +215,15 @@ int main(int argc, char *argv[])
     
     // process conntrack table
     if (!no_hdr) {
-	if (!EXT_VIEW) {
-	    printf("%-6s%-31s%-31s%-6s\n","Proto","NATed Address","Foreign Address","State");
-	} else {
-	    printf("%-6s%-41s%-41s%-6s\n","Proto","NATed Address","Foreign Address","State");
+	if (LOCAL) {
+	    strcpy(from, "Source Address");
+	    strcpy(dest, "Destination Address");
 	    }
+	if (!EXT_VIEW) {
+	    printf("%-6s%-31s%-31s%-6s\n","Proto",from,dest,"State");
+	} else {
+	    printf("%-6s%-41s%-41s%-6s\n","Proto",from,dest,"State");
+	    } 
 	}
 
     while (fgets(line,1000,f)!=NULL) 
@@ -238,9 +257,15 @@ int main(int argc, char *argv[])
 	}
     fclose(f);
     
-    // create array pointed to main connection array
+    // create index of arrays pointed to main connection array
+    if ((pa = (char ***)malloc((connection_index) * sizeof(char **))) == NULL)
+	(void)oopsy();
     for (index = 0; index < connection_index; index++)	{
+	if ((pa[index] = (char **)malloc((ROWS) * sizeof(char *))) == NULL)
+	    (void)oopsy();
 	for (j=0; j<ROWS; j++) {
+	    if ((pa[index][j] = (char *)malloc(2)) == NULL)
+		(void)oopsy();
 	    pa[index][j] = &connection_table[index][j][0];
 	    }
 	}
@@ -560,6 +585,23 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     char *buff;
     char msg[50];
     
+    if ((connection_table = (char ***)realloc(connection_table, (connection_index +1)*sizeof(char **))) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index] = (char **)malloc(200 * sizeof(char *))) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][0] = (char *)malloc(10)) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][1] = (char *)malloc(60)) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][2] = (char *)malloc(60)) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][3] = (char *)malloc(20)) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][4] = (char *)malloc(20)) == NULL)
+	(void)oopsy();
+    if ((connection_table[connection_index][5] = (char *)malloc(15)) == NULL)
+	(void)oopsy();
+    
     //ports
     if ((match(src_port, "=")) && (match(dst_port, "="))) {
 	//source port
@@ -693,6 +735,12 @@ int check_if_destination(char *host)
     return 0;
     }
 
+void oopsy()
+    {
+    printf("Hmm couldn't allocate memory...\n");
+    exit(1);
+    }
+
 void display_help()
     {
     printf("args: -h: displays this help\n");
@@ -702,10 +750,11 @@ void display_help()
     printf("      -d <destination-host>: display connections by destination\n");
     printf("      -S: display SNAT connections\n");
     printf("      -D: display DNAT connections (default: SNAT & DNAT)\n");
-    printf("      -L: display only connections to NAT box self (disables SNAT & DNAT)\n"); 
+    printf("      -L: display only connections to NAT box itself (doen't show SNAT & DNAT)\n"); 
     printf("      -x: extended hostnames view\n");
     printf("      -r src | dst | src-port | dst-port | state : sort connections\n");
     printf("      -o: strip output header\n");
+    printf("      -v: print version\n");
     }
 
     

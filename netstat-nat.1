@@ -35,7 +35,7 @@ display SNAT connections
 display DNAT connections
 .TP
 .B -L
-display only connections to NAT box self (disables SNAT & DNAT)
+display only connections to NAT box self (doesn't show SNAT & DNAT)
 .TP
 .B -x
 extended view of hostnames
@@ -45,6 +45,9 @@ sort connections
 .TP
 .B -o
 no output header
+.TP
+.B -v
+prints version
 .SH FILES
 /proc/net/ip_conntrack
 .SH SEE ALSO

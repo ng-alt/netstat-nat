@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.3 2002/09/08 20:23:48 mardan Exp $     
+# $Id: netstat-nat.h,v 1.5 2002/09/22 20:10:20 mardan Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
@@ -35,9 +35,8 @@
 #include <arpa/inet.h>
 
 
-#define MAX_CONN 	2048	/* maximum connections in array */
+#define VERSION		"1.4.1"
 #define ROWS		6
-#define ROW_SIZE	70
 
 
 void protocol_tcp(char *line);
@@ -56,6 +55,6 @@ int match(char *string, char *pattern);
 int check_if_source(char *host);
 int check_if_destination(char *host);
 void lookup_portname(char *port,char *proto);
-
+void oopsy();
 
 /* The End */

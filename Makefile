@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 #
-# $Id: Makefile,v 1.3 2002/09/12 19:32:12 mardan Exp $ 
+# $Id: Makefile,v 1.5 2002/11/23 21:09:47 mardan Exp $ 
 #
 #
 # Copyright (c) 2002 by D.Wijsman (mardan@tweegy.demon.nl). 
@@ -23,12 +23,12 @@
 #
 #-------------------------------------------------------------------------------
 
-VERSION = 1.4
+VERSION = 1.4.1
 SHELL = /bin/sh
 BINDIR = /usr/bin
 ETCDIR = /etc
 MANDIR = /usr/share/man/man1
-DOCDIR = /usr/share/doc/netstat-nat
+DOCDIR = /usr/share/doc
 INSTALL = install -c
 
 
@@ -38,9 +38,9 @@ CC = gcc -O2
 PROG_SRC = netstat-nat.c
 PROG_BIN = netstat-nat
 PROG_MAN = netstat-nat.1
-DOC = COPYING README
+DOC = COPYING README INSTALL AUTHORS CHANGELOG
 
-all:	clean netstat-nat
+all:	netstat-nat
 
 
 netstat-nat:
@@ -52,9 +52,16 @@ clean:
 
 
 install:
-	mkdir -p $(DOCDIR)-$(VERSION) 
+	mkdir -p $(DOCDIR)/$(PROG_BIN)-$(VERSION) 
 	mkdir -p $(MANDIR)
 	$(INSTALL) -s $(PROG_BIN) $(BINDIR)
 	$(INSTALL) -m 444 $(PROG_MAN) $(MANDIR)
-	$(INSTALL) -m 444 $(DOC) $(DOCDIR)-$(VERSION)
+	$(INSTALL) -m 444 $(DOC) $(DOCDIR)/$(PROG_BIN)-$(VERSION)
+
+
+uninstall:
+	rm -r $(BINDIR)/$(PROG_BIN)
+	rm -r $(MANDIR)/$(PROG_MAN)
+	rm -r $(DOCDIR)/$(PROG_BIN)*
+
 
