@@ -1,0 +1,36 @@
+$Id: README,v 1.1 2002/06/30 19:55:41 mardan Exp $
+
+
+Description:
+-----------------------------------------------------------
+Netstat-nat displays NATed connections when using iptables.
+(http://netfilter.samba.org/)
+
+-----------------------------------------------------------
+
+
+Compiling:
+-----------------------------------------------------------
+gcc netstat-nat.c -o netstat-nat
+strip netstat-nat
+
+-----------------------------------------------------------
+
+
+Usage:
+-----------------------------------------------------------
+netstat-nat -h		: displays help
+netstat-nat -n		: displays NATed connections
+			  without hostname-resolving.
+netstat-nat -p tcp | udp | icmp
+			: diplays NATed connections with
+			  protocol selection.
+			  
+-----------------------------------------------------------
+
+
+Author:
+-----------------------------------------------------------
+D.Wijsman mardan@tweegy.demon.nl
+
+-----------------------------------------------------------
