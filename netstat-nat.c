@@ -1,9 +1,13 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.28 2005/01/29 15:24:37 mardan Exp $     
+# $Id: netstat-nat.c,v 1.29 2005/07/20 19:50:43 mardan Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.29  2005/07/20 19:50:43  mardan
+# gcc 2.96 compatability fix
+# enlarged readin of ip_conntrack line
+#
 # Revision 1.28  2005/01/29 15:24:37  mardan
 # Some cleanups, bumped to version 1.4.5
 #
@@ -152,7 +156,7 @@
 
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.28 2005/01/29 15:24:37 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.29 2005/07/20 19:50:43 mardan Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
@@ -172,7 +176,7 @@ int main(int argc, char *argv[])
     static int RESOLVE = 1;
     static int no_hdr = 0;
     FILE *f;
-    char line[200];
+    char line[350];
     char src[50];
     char dst[50];
     char buf[100];
@@ -442,8 +446,7 @@ int get_connection_state(char *line, char *state)
 
 void process_entry(char *line)
 {
-    int count;
-    count = 0;
+    int count = 0;
     char srcip_f[16] = "";
     char dstip_f[16] = "";
     char srcip_s[16] = "";
