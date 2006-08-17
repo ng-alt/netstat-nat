@@ -1,10 +1,10 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.11 2005/01/29 15:24:37 mardan Exp $     
+# $Id: netstat-nat.h,v 1.12 2006/08/17 17:43:25 danny Exp $     
 #       
 #                                                                                                                  
-# Copyright (c) 2005 by D.Wijsman (danny@tweegy.demon.nl). 
+# Copyright (c) 2006 by D.Wijsman (danny@tweegy.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it

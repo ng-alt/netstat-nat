@@ -1,9 +1,15 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.29 2005/07/20 19:50:43 mardan Exp $     
+# $Id: netstat-nat.c,v 1.30 2006/08/17 17:43:25 danny Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.30  2006/08/17 17:43:25  danny
+# - fix for read-in (ip_conntrack), previous versions could sometimes hang or
+#   segfault on some systems.
+# - fix for displaying dnat over snat connections.
+# - changed my email to danny@tweegy.nl and changed homepage url
+#
 # Revision 1.29  2005/07/20 19:50:43  mardan
 # gcc 2.96 compatability fix
 # enlarged readin of ip_conntrack line
@@ -133,7 +139,7 @@
 #
 #
 #                                                                                                                  
-# Copyright (c) 2005 by D.Wijsman (danny@tweegy.demon.nl). 
+# Copyright (c) 2006 by D.Wijsman (danny@tweegy.nl). 
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -156,7 +162,7 @@
 
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.29 2005/07/20 19:50:43 mardan Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.30 2006/08/17 17:43:25 danny Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
@@ -267,8 +273,10 @@ int main(int argc, char *argv[])
 	    } 
 	}
 
-    while (fgets(line, sizeof(line), f) != NULL) 
+    // bugfix for proper read-in on some systems, provided by Supaflyster
+    while (!feof(f)) 
     {
+	fgets(line, sizeof(line), f);
         process_entry(line);
     }
 
@@ -453,6 +461,7 @@ void process_entry(char *line)
     char dstip_s[16] = "";
     char srcport[6] = "";
     char dstport[6] = "";
+    char srcport_s[6] = "";
     char protocol[5] = "";
     char state[12] = "";
 
@@ -462,6 +471,7 @@ void process_entry(char *line)
     search_sec_hit("dst=", line, dstip_s);    
     search_first_hit("sport=", line, srcport);    
     search_first_hit("dport=", line, dstport);    
+    search_sec_hit("sport=", line, srcport_s);
 
     get_protocol(line, protocol);
     if (strcmp(PROTOCOL, "")) {
@@ -480,6 +490,12 @@ void process_entry(char *line)
 	if ((strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0)) {		
 	    check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, state);
 	}
+    }
+    // bugfix for displaying dnat over snat connections, submiited by Supaflyster
+    if (DNAT || SNAT) {
+	if ((!strcmp(srcip_f, srcip_s) == 0) && (!strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0) && (!strcmp(dstip_f, dstip_s) == 0) ) {
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, state);
+	}    
     }
     if (LOCAL) {
         if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		

@@ -1,4 +1,4 @@
-$Id: README,v 1.13 2005/01/29 15:24:37 mardan Exp $
+$Id: README,v 1.14 2006/08/17 17:43:25 danny Exp $
 
 
 Description:
@@ -50,7 +50,7 @@ netstat-nat -v     		: prints version
 
 Homepage:
 -------------------------------------------------------------------------------
-http://tweegy.demon.nl/projects/netstat-nat/
+http://www.tweegy.nl/projects/netstat-nat/
 
 -------------------------------------------------------------------------------
 
@@ -84,12 +84,16 @@ which fixes some rpmlint warnings.
 
 Gumundur D. Haraldsson <gdh@binhex.EU.org> for submitting a patch which does a
 more properly memory allocation and saver copies of variables. (merged in v1.4.3) 
+
+Supaflyster for submitting patch for proper read-in on some systems and 
+pointing out dnat over snat connections problem, which weren't shown in output.
+(v1.4.7)
 -------------------------------------------------------------------------------
 
 
 Contact:
 -------------------------------------------------------------------------------
-D.Wijsman danny@tweegy.demon.nl
+D.Wijsman danny@tweegy.nl
 
 -------------------------------------------------------------------------------
 
