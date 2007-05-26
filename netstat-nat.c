@@ -1,9 +1,13 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.30 2006/08/17 17:43:25 danny Exp $     
+# $Id: netstat-nat.c,v 1.31 2007/05/26 11:48:08 danny Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.31  2007/05/26 11:48:08  danny
+# Added 'nf_conntrack' support
+# Added NAT host connection information (Used IP and port for NAT)
+#
 # Revision 1.30  2006/08/17 17:43:25  danny
 # - fix for read-in (ip_conntrack), previous versions could sometimes hang or
 #   segfault on some systems.
@@ -162,7 +166,7 @@
 
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.30 2006/08/17 17:43:25 danny Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.31 2007/05/26 11:48:08 danny Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
@@ -176,19 +180,22 @@ char ***connection_table;
 
 int main(int argc, char *argv[])
     {
-    const char *args = "hnp:s:d:SDxor:L?v";
+    const char *args = "hnp:s:d:SDxor:L?vN";
     static int SORT_ROW = 1;
     static int EXT_VIEW = 0;
     static int RESOLVE = 1;
     static int no_hdr = 0;
+    static int NAT_HOP = 0;
     FILE *f;
     char line[350];
     char src[50];
     char dst[50];
+    char host[50];
     char buf[100];
     char buf2[100];
     char from[50] = "NATed Address";
-    char dest[50] = "Foreign Address";
+    char nathost[50] = "NAT-host Address";
+    char dest[50] = "Destination Address";
     
     char ***pa;
     char *store;
@@ -239,6 +246,9 @@ int main(int argc, char *argv[])
 	case 'o':
 	    no_hdr = 1;
 	    break;
+	case 'N':
+	    NAT_HOP = 1;
+	    break;
 	case 'r':
 	    if (optarg == NULL || optarg == '\0') {
 		display_help();
@@ -252,13 +262,20 @@ int main(int argc, char *argv[])
 	    break; 
 	}
     }
+    // some param checks
+    if (LOCAL == 1) {
+	SNAT = 0;
+	DNAT = 0;
+	NAT_HOP = 0;
+    }
     
     // some checking for IPTables and read file
-    if ((f = fopen("/proc/net/ip_conntrack","r")) == NULL) {
-//    if ((f = fopen("./conntrack.dump","r")) == NULL) {
-	printf("Could not read info about connections from the kernel, make sure netfilter is enabled in kernel or by modules.\n");
-	return 1;
+    if ((f = fopen(NF_CONNTRACK_LOCATION, "r")) == NULL) {
+	if ((f = fopen(IP_CONNTRACK_LOCATION, "r")) == NULL) {
+	    printf("Could not read info about connections from the kernel, make sure netfilter is enabled in kernel or by modules.\n");
+	    return 1;
 	}
+    }
     
     // process conntrack table
     if (!no_hdr) {
@@ -267,9 +284,19 @@ int main(int argc, char *argv[])
 	    strcopy(dest, sizeof(dest), "Destination Address");
 	    }
 	if (!EXT_VIEW) {
-	    printf("%-6s%-31s%-31s%-6s\n", "Proto", from, dest, "State");
+	    printf("%-6s%-31s", "Proto", from);
+	    if (NAT_HOP && !LOCAL) {
+		printf("%-31s", nathost);
+	    }
+	    printf("%-31s%-6s" ,dest, "State");
+	    printf("\n");
 	} else {
-	    printf("%-6s%-41s%-41s%-6s\n", "Proto", from, dest, "State");
+	    printf("%-6s%-41s", "Proto", from);
+	    if (NAT_HOP && !LOCAL) {
+		printf("%-41s", nathost);
+	    }
+	    printf("%-41s%-6s" ,dest, "State");
+	    printf("\n");
 	    } 
 	}
 
@@ -277,7 +304,10 @@ int main(int argc, char *argv[])
     while (!feof(f)) 
     {
 	fgets(line, sizeof(line), f);
-        process_entry(line);
+	if (strlen(line) > 0) {
+    	    process_entry(line);
+	}
+	memset(line, 0, sizeof(line));
     }
 
     fclose(f);
@@ -325,9 +355,11 @@ int main(int argc, char *argv[])
 	if (RESOLVE) {
 	    lookup_hostname(&pa[index][1]);
 	    lookup_hostname(&pa[index][2]);
-	    if (strlen(pa[index][3]) > 0 || strlen(pa[index][4]) > 0) {
+	    lookup_hostname(&pa[index][6]);
+	    if (strlen(pa[index][3]) > 0 || strlen(pa[index][4]) > 0 || strlen(pa[index][7]) > 0) {
 		lookup_portname(&pa[index][3], pa[index][0]);
 		lookup_portname(&pa[index][4], pa[index][0]);
+		lookup_portname(&pa[index][7], pa[index][0]);
 	    	}
 	    }
 	if (!EXT_VIEW) {
@@ -349,6 +381,17 @@ int main(int argc, char *argv[])
 	        snprintf(buf2, sizeof(buf2), "%s", buf);
             }
 	    snprintf(dst, sizeof(dst), "%-31s", buf2);
+	    if (NAT_HOP) {
+		strcopy(buf, sizeof(buf), ""); 
+		strncat(buf, pa[index][6], 29 - strlen(pa[index][7]));    
+		if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+            	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][7]);            
+		}
+        	else {
+	    	    snprintf(buf2, sizeof(buf2), "%s", buf);
+        	}
+		snprintf(host, sizeof(dst), "%-31s", buf2);
+	    }
 	} else {
 	    strcopy(buf, sizeof(buf), ""); 
 	    strncat(buf, pa[index][1], 39 - strlen(pa[index][3]));    
@@ -368,11 +411,27 @@ int main(int argc, char *argv[])
 	        snprintf(buf2, sizeof(buf2), "%s", buf);
 	    }
             snprintf(dst, sizeof(dst), "%-41s", buf2);
+	    if (NAT_HOP) {
+		strcopy(buf, sizeof(buf), ""); 
+		strncat(buf, pa[index][6], 39 - strlen(pa[index][7]));    
+		if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
+            	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][7]);            
+		}
+        	else {
+	    	    snprintf(buf2, sizeof(buf2), "%s", buf);
+        	}
+		snprintf(host, sizeof(dst), "%-41s", buf2);
 	    }
-	printf("%-6s%s%s%-11s\n", pa[index][0], src, dst, pa[index][5]);
 	}
-    return(0);
+	printf("%-6s%s", pa[index][0], src);
+	if (NAT_HOP) {
+	    printf("%s", host);
+	}
+	printf("%s%-11s", dst, pa[index][5]);
+	printf("\n");
     }
+    return(0);
+}
 
 // get protocol
 int get_protocol(char *line, char *protocol)
@@ -462,6 +521,7 @@ void process_entry(char *line)
     char srcport[6] = "";
     char dstport[6] = "";
     char srcport_s[6] = "";
+    char dstport_s[6] = "";
     char protocol[5] = "";
     char state[12] = "";
 
@@ -472,6 +532,7 @@ void process_entry(char *line)
     search_first_hit("sport=", line, srcport);    
     search_first_hit("dport=", line, dstport);    
     search_sec_hit("sport=", line, srcport_s);
+    search_sec_hit("dport=", line, dstport_s);
 
     get_protocol(line, protocol);
     if (strcmp(PROTOCOL, "")) {
@@ -483,23 +544,23 @@ void process_entry(char *line)
     get_connection_state(line, state);
     if (SNAT) {
 	if ((!strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		
-  	    check_src_dst(protocol, srcip_f, dstip_f, srcport, dstport, state);
+  	    check_src_dst(protocol, srcip_f, dstip_f, srcport, dstport, dstip_s, dstport_s, state);
 	    }
     }
     if (DNAT) {
 	if ((strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0)) {		
-	    check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, state);
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, dstip_f, dstport_s, state);
 	}
     }
     // bugfix for displaying dnat over snat connections, submiited by Supaflyster
     if (DNAT || SNAT) {
 	if ((!strcmp(srcip_f, srcip_s) == 0) && (!strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0) && (!strcmp(dstip_f, dstip_s) == 0) ) {
-	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, state);
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, dstip_s, dstport_s, state);
 	}    
     }
     if (LOCAL) {
         if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		
-            check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, state);
+            check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, "", "", state);
 	}
     }
 //    printf("%s %s %s %s %s %s\n", protocol, srcip_f, dstip_f, srcip_s, dstip_s, state);
@@ -508,20 +569,20 @@ void process_entry(char *line)
 
 // -- Internal used functions
 // Check filtering by source and destination IP
-void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status) 
+void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *nathostip, char *nathostport, char *status) 
     {
     if ((check_if_source(src_ip)) && (strcmp(DST_IP, "") == 0)) {
-	store_data(protocol, src_ip, dst_ip, src_port, dst_port, status);
+	store_data(protocol, src_ip, dst_ip, src_port, dst_port, nathostip, nathostport, status);
 	}
     else if ((check_if_destination(dst_ip)) && (strcmp(SRC_IP, "") == 0)) {
-	store_data(protocol, src_ip, dst_ip, src_port, dst_port, status);
+	store_data(protocol, src_ip, dst_ip, src_port, dst_port, nathostip, nathostport, status);
 	}
     else if ((check_if_destination(dst_ip)) && (check_if_source(src_ip))) {
-	store_data(protocol, src_ip, dst_ip, src_port, dst_port, status);
+	store_data(protocol, src_ip, dst_ip, src_port, dst_port, nathostip, nathostport, status);
 	}
     }
 
-void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status)  
+void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *nathostip, char *nathostport, char *status)  
     {
     
     connection_table = (char ***) xrealloc(connection_table, (connection_index +1) * sizeof(char **));
@@ -532,6 +593,8 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     connection_table[connection_index][3] = (char *) xcalloc(20);
     connection_table[connection_index][4] = (char *) xcalloc(20);
     connection_table[connection_index][5] = (char *) xcalloc(15);
+    connection_table[connection_index][6] = (char *) xcalloc(60); 
+    connection_table[connection_index][7] = (char *) xcalloc(20);
     
     strcopy(connection_table[connection_index][3], 20, src_port);
     strcopy(connection_table[connection_index][4], 20, dst_port);
@@ -539,6 +602,8 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     strcopy(connection_table[connection_index][2], 60, dst_ip);
     strcopy(connection_table[connection_index][0], 10, protocol);
     strcopy(connection_table[connection_index][5], 15, status);
+    strcopy(connection_table[connection_index][6], 20, nathostip);
+    strcopy(connection_table[connection_index][7], 20, nathostport);
     connection_index++;
     }
 
@@ -784,6 +849,7 @@ void display_help()
     printf("      -x: extended hostnames view\n");
     printf("      -r src | dst | src-port | dst-port | state : sort connections\n");
     printf("      -o: strip output header\n");
+    printf("      -N: display NAT box connection information (only valid with SNAT & DNAT)\n");
     printf("      -v: print version\n");
     }
 

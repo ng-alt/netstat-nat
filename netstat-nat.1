@@ -9,7 +9,7 @@ netstat-nat \- Show the natted connections on a linux iptable firewall
 Displays NAT connections managed by netfilter/iptables which comes
 with the > 2.4.x linux kernels.
 
-The program reads its information from '/proc/net/ip_conntrack', which is
+The program reads its information from '/proc/net/ip_conntrack' or '/proc/net/nf_conntrack', which is
 the temporary conntrack-storage of netfilter. 
 .SH OPTIONS
 .TP
@@ -46,14 +46,17 @@ sort connections
 .B -o
 no output header
 .TP
+.B -N
+display NAT box connection information (only valid with SNAT & DNAT)
+.TP
 .B -v
 prints version
 .SH FILES
-/proc/net/ip_conntrack
+/proc/net/ip_conntrack or /proc/net/nf_conntrack 
 .SH SEE ALSO
 http://www.tweegy.nl/projects/netstat-nat/
 .br
-http://netfilter.samba.org/
+http://www.netfilter.org/
 .SH AUTHOR
 netstat-nat has been written by D.Wijsman danny@tweegy.nl
 .br

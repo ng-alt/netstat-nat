@@ -1,6 +1,6 @@
 Summary 	: netstat-nat displays NAT connections
 Name		: netstat-nat
-Version		: 1.4.7
+Version		: 1.4.8
 Release		: 1
 License		: GPL
 Packager	: Danny Wijsman <danny@tweegy.nl>
@@ -11,10 +11,11 @@ BuildRoot	: %{_tmppath}/%{name}-%{version}-root
 Prefix		: %{_prefix}
 
 %description
-Netstat-nat is a small program written in C. It displays NAT connections,
-managed by netfilter/iptables which comes with the > 2.4.x linux kernels.
-The program reads its information from '/proc/net/ip_conntrack', which is
-the temporary conntrack-storage of netfilter. (http://netfilter.samba.org/)
+Netstat-nat is a small program written in C. It displays NAT connections, 
+managed by netfilter/iptables which comes with the > 2.4.x linux kernels. The 
+program reads its information from '/proc/net/ip_conntrack' or 
+'/proc/net/nf_conntrack', which is the temporary conntrack-storage of 
+netfilter. (http://www.netfilter.org/)
 Netstat-nat takes several arguments (but not needed).
 
 %prep

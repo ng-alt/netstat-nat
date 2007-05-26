@@ -1,8 +1,12 @@
-$Id: ChangeLog,v 1.4 2006/08/17 17:43:25 danny Exp $
+$Id: ChangeLog,v 1.5 2007/05/26 11:48:08 danny Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.8
+- Added 'nf_conntrack' support
+- Added NAT host connection information (used IP and port for NAT)
+
 version: 1.4.7
 - fix for read-in (ip_conntrack), previous versions could sometimes hang or 
   segfault on some systems.

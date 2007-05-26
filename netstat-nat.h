@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.12 2006/08/17 17:43:25 danny Exp $     
+# $Id: netstat-nat.h,v 1.13 2007/05/26 11:48:08 danny Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2006 by D.Wijsman (danny@tweegy.nl). 
@@ -35,15 +35,16 @@
 #include <errno.h>
 #include <strings.h>
 
-//#define VERSION		"1.4.4"
-#define ROWS		6
+#define ROWS			8
+#define IP_CONNTRACK_LOCATION	"/proc/net/ip_conntrack"
+#define NF_CONNTRACK_LOCATION	"/proc/net/nf_conntrack"
 
 
 int get_protocol(char *line, char *protocol);
 int get_connection_state(char *line, char *state);
 void process_entry(char *line);
-void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
-void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *status);
+void check_src_dst(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *nathostip, char *nathostport, char *status);
+void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char *dst_port, char *nathostip, char *nathostport, char *status);
 void extract_ip(char *gen_buffer);
 void display_help();
 int lookup_hostname(char **r_host);
