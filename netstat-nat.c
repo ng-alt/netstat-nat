@@ -1,9 +1,13 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.31 2007/05/26 11:48:08 danny Exp $     
+# $Id: netstat-nat.c,v 1.32 2007/11/24 13:18:48 danny Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.32  2007/11/24 13:18:48  danny
+# - Added '-R' option to show routed connections instead of showing them with '-L'
+# - Some allocation & free bugs were squashed
+#
 # Revision 1.31  2007/05/26 11:48:08  danny
 # Added 'nf_conntrack' support
 # Added NAT host connection information (Used IP and port for NAT)
@@ -164,23 +168,32 @@
 #-------------------------------------------------------------------------------
 */
 
+
+typedef struct _ip_addresses
+{
+    char ip[16];
+    char dev[16];
+    struct _ip_addresses *prev;
+    struct _ip_addresses *next;
+} sIpAddresses;
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.31 2007/05/26 11:48:08 danny Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.32 2007/11/24 13:18:48 danny Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
 int DNAT = 1;
 int LOCAL = 0;
+int ROUTED = 0;
 static char PROTOCOL[4];
 int connection_index = 0;
 char ***connection_table;
-
+struct _ip_addresses *IpAddresses = NULL;
 
 
 int main(int argc, char *argv[])
     {
-    const char *args = "hnp:s:d:SDxor:L?vN";
+    const char *args = "hnp:s:d:SDxor:L?vNR";
     static int SORT_ROW = 1;
     static int EXT_VIEW = 0;
     static int RESOLVE = 1;
@@ -200,6 +213,15 @@ int main(int argc, char *argv[])
     char ***pa;
     char *store;
     int index, a, b, c, j, r;
+
+    /* variables to display routed and/or local connections */
+    struct ifconf ifc;
+    struct ifreq *req;
+    struct sockaddr_in *ipaddr;
+    char *ifbuf, *facename,  *ptr;
+    int facefound, lastlen, len, sock;
+    //IpAddresses = NULL;
+    /* */
     
     connection_table = (char ***) xcalloc((1) * sizeof(char **));
 
@@ -239,6 +261,13 @@ int main(int argc, char *argv[])
 	    SNAT = 0;
 	    DNAT = 0;
 	    LOCAL = 1;
+	    ROUTED = 0;
+	    break;
+	case 'R':
+	    SNAT = 0;
+	    DNAT = 0;
+	    LOCAL = 0;
+	    ROUTED = 1;	    
 	    break;
 	case 'x':
 	    EXT_VIEW = 1;
@@ -263,10 +292,51 @@ int main(int argc, char *argv[])
 	}
     }
     // some param checks
-    if (LOCAL == 1) {
+    if (LOCAL == 1 || ROUTED == 1) {
 	SNAT = 0;
 	DNAT = 0;
 	NAT_HOP = 0;
+    }
+    // get local IP addresses 
+    if (ROUTED || LOCAL) {
+	/* find all interfaces */
+	sock = socket(PF_INET, SOCK_DGRAM, 0);
+	lastlen = 0;
+	len = 100 * sizeof(struct ifreq);
+	for(;;) {
+	    if((ifbuf = malloc(len)) == NULL) {
+    		perror("malloc");
+    		exit(EXIT_FAILURE);
+	    }
+	    ifc.ifc_buf = ifbuf;
+	    ifc.ifc_len = len;
+
+	    if(ioctl(sock, SIOCGIFCONF, &ifc) < 0) {
+    		if(errno != EINVAL || lastlen != 0) {
+    		    perror("ioctl:SIOCGIFCONF");
+    		    exit(EXIT_FAILURE);
+    		}
+	    } else {
+		if(ifc.ifc_len == lastlen)
+		/* success */
+    		    break;
+    		lastlen = ifc.ifc_len;
+	    }
+	    /* increment buffer */
+	    len += 10 * sizeof(struct ifreq);
+	    free(ifbuf);
+	}
+	/* store all local addresses in memory */
+        for(ptr = ifbuf; ptr < ifbuf + ifc.ifc_len; ) {
+	    req = (struct ifreq *)ptr;
+	    ipaddr = (struct sockaddr_in *) &req->ifr_addr;
+//	    printf("The IP address associated with %s is %s\n", req->ifr_name, inet_ntoa(ipaddr->sin_addr));
+	    ip_addresses_add(&IpAddresses, req->ifr_name, inet_ntoa(ipaddr->sin_addr));
+	    ptr += sizeof(struct ifreq);
+	}
+	if (ifbuf) {
+	    free(ifbuf);
+	}
     }
     
     // some checking for IPTables and read file
@@ -279,7 +349,7 @@ int main(int argc, char *argv[])
     
     // process conntrack table
     if (!no_hdr) {
-	if (LOCAL) {
+	if (LOCAL || ROUTED) {
 	    strcopy(from, sizeof(from), "Source Address");
 	    strcopy(dest, sizeof(dest), "Destination Address");
 	    }
@@ -312,6 +382,7 @@ int main(int argc, char *argv[])
 
     fclose(f);
     
+    
     // create index of arrays pointed to main connection array
     if (connection_index == 0) {
 	// There are no connections at this moment!
@@ -324,7 +395,6 @@ int main(int argc, char *argv[])
 	pa[index] = (char **) xcalloc((ROWS) * sizeof(char *));
 
 	for (j = 0; j < ROWS; j++) {
-	    pa[index][j] = (char *) xcalloc(2);
 	    pa[index][j] = &connection_table[index][j][0];
 	    }
 	}
@@ -350,6 +420,7 @@ int main(int argc, char *argv[])
 		}
 	    }
 	}
+
     // print connections
     for (index = 0; index < connection_index; index++) {  
 	if (RESOLVE) {
@@ -429,7 +500,20 @@ int main(int argc, char *argv[])
 	}
 	printf("%s%-11s", dst, pa[index][5]);
 	printf("\n");
+
     }
+
+    ip_addresses_free(&IpAddresses);
+
+    for (a = 0; a < connection_index; a++) {
+	for (j = 0; j < ROWS; j++) {
+	    if (connection_table[a][j] != NULL) free(connection_table[a][j]);
+	}
+	free(connection_table[a]);
+	free(pa[a]);
+    }
+    free(connection_table);
+    free(pa);
     return(0);
 }
 
@@ -437,8 +521,8 @@ int main(int argc, char *argv[])
 int get_protocol(char *line, char *protocol)
 {
     int i,j, protocol_nr;
-    char protocol_name[10] = "";
-    char protocol_raw[5] = "";
+    char protocol_name[11] = "";
+    char protocol_raw[6] = "";
     
     if (string_search(line, "tcp")) {
         memcpy(protocol, "tcp", 3);
@@ -462,7 +546,7 @@ int get_protocol(char *line, char *protocol)
                 }
                 protocol_nr = atoi(protocol_raw);
                 get_protocol_name(protocol_name, protocol_nr);
-                memcpy(protocol, protocol_name, 9);
+                memcpy(protocol, protocol_name, 5);
                 break;
             }
         }
@@ -559,7 +643,16 @@ void process_entry(char *line)
 	}    
     }
     if (LOCAL) {
-        if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)) {		
+        if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)
+	    && ((ip_addresses_search(IpAddresses, srcip_f) == 1) || (ip_addresses_search(IpAddresses, srcip_s) == 1) 
+	    || (ip_addresses_search(IpAddresses, dstip_f) == 1) || (ip_addresses_search(IpAddresses, dstip_s) == 1))) {		
+            check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, "", "", state);
+	}
+    }
+    if (ROUTED) {
+        if ((strcmp(srcip_f, dstip_s) == 0) && (strcmp(dstip_f, srcip_s) == 0)
+	    && (ip_addresses_search(IpAddresses, srcip_f) == 0) && (ip_addresses_search(IpAddresses, srcip_s) == 0) 
+	    && (ip_addresses_search(IpAddresses, dstip_f) == 0) && (ip_addresses_search(IpAddresses, dstip_s) == 0)) {		
             check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, "", "", state);
 	}
     }
@@ -602,7 +695,7 @@ void store_data(char *protocol, char *src_ip, char *dst_ip, char *src_port, char
     strcopy(connection_table[connection_index][2], 60, dst_ip);
     strcopy(connection_table[connection_index][0], 10, protocol);
     strcopy(connection_table[connection_index][5], 15, status);
-    strcopy(connection_table[connection_index][6], 20, nathostip);
+    strcopy(connection_table[connection_index][6], 60, nathostip);
     strcopy(connection_table[connection_index][7], 20, nathostport);
     connection_index++;
     }
@@ -618,9 +711,9 @@ void lookup_portname(char **port, char *proto)
     portnr = htons(atoi(buf_port));
     
     if ((service = getservbyport(portnr, proto))) {
-	port_size = strlen(service->s_name) + 8;
-        *port = xrealloc(*port, port_size);
-	strcopy(*port, port_size, service->s_name);
+	//port_size = strlen(service->s_name) + 8;
+        //*port = xrealloc(*port, port_size); hmm double alloction
+	strcopy(*port, 20, service->s_name);
 	}
     }
 
@@ -646,9 +739,9 @@ int lookup_hostname(char **r_host)
     for (p = hp->h_addr_list; *p != 0; p++){
 	struct in_addr in;
 	(void)memcpy(&in.s_addr, *p, sizeof(in.s_addr));
-	r_host_size = strlen(*r_host) + 25;
-	*r_host = xrealloc(*r_host, r_host_size);	
-	strcopy(*r_host, r_host_size, hp->h_name);
+	//r_host_size = strlen(*r_host) + 25;
+	//*r_host = xrealloc(*r_host, r_host_size); hmm double allocation
+	strcopy(*r_host, 60, hp->h_name);
 	}
     return 0;
     }
@@ -737,6 +830,63 @@ static void *xrealloc(void *oldbuf, size_t newbufsize)
 	}
     }
 
+char *xstrdup (const char *dup)
+{
+    char *ret;
+    if ((ret = strdup(dup)) == NULL) {
+	printf("Could not set value into struct (%s); %s.\n -- Exiting.\n", dup, strerror(errno));
+	exit(EXIT_FAILURE);
+    }	
+    return ret;
+}
+
+void ip_addresses_add(struct _ip_addresses **list, const char *dev, const char *ip)
+{
+    struct _ip_addresses *new = malloc(sizeof * new);
+    if (new != NULL) {
+	strncpy(new->ip, ip, 15);
+	strncpy(new->dev, dev, 15);
+	new->next = NULL;
+	if (*list == NULL) {
+	    *list = new;
+	}
+	else {
+	    struct _ip_addresses *tail = *list;
+	    while (tail->next != NULL) 
+	    {
+		tail = tail->next;
+	    }
+	    tail->next = new;
+	}
+    }
+}
+
+int ip_addresses_search(struct _ip_addresses *list, const char *ip)
+{
+    struct _ip_addresses *akt = list;
+    if (list == NULL) return 0;
+    while (akt != NULL) 
+    {
+	if (strcmp (akt->ip, ip) == 0) {
+	    return 1;
+	}
+	akt = akt->next;
+    }
+    return 0;
+}
+
+void ip_addresses_free(struct _ip_addresses **node)
+{
+    struct _ip_addresses *this = *node;
+    struct _ip_addresses *temp;
+    while (this != NULL) 
+    {
+	temp = this->next;
+	free(this);
+	this = temp;
+    }
+    *node = NULL;
+}
 
 int string_search(char *string, char *search)
 {
@@ -846,11 +996,15 @@ void display_help()
     printf("      -S: display SNAT connections\n");
     printf("      -D: display DNAT connections (default: SNAT & DNAT)\n");
     printf("      -L: display only connections to NAT box itself (doesn't show SNAT & DNAT)\n"); 
+    printf("      -R: display only connections routed through the NAT box (doesn't show SNAT & DNAT)\n"); 
     printf("      -x: extended hostnames view\n");
     printf("      -r src | dst | src-port | dst-port | state : sort connections\n");
     printf("      -o: strip output header\n");
     printf("      -N: display NAT box connection information (only valid with SNAT & DNAT)\n");
     printf("      -v: print version\n");
+    printf("\n");
+    printf("      netstat-nat [-S|-D|-L|-R] [-no]\n");
+    printf("      netstat-nat [-nxo]\n");
     }
 
 // -- End of internal used functions

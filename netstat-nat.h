@@ -1,7 +1,7 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.h,v 1.13 2007/05/26 11:48:08 danny Exp $     
+# $Id: netstat-nat.h,v 1.14 2007/11/24 13:18:48 danny Exp $     
 #       
 #                                                                                                                  
 # Copyright (c) 2006 by D.Wijsman (danny@tweegy.nl). 
@@ -34,6 +34,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <strings.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 
 #define ROWS			8
 #define IP_CONNTRACK_LOCATION	"/proc/net/ip_conntrack"
@@ -57,6 +59,11 @@ void oopsy(int size);
 static void *xrealloc(void *oldbuf, size_t newbufsize);
 static void *xcalloc(size_t bufsize);
 void get_protocol_name(char *protocol_name, int protocol_nr);
+char *xstrdup (const char *dup);
+void ip_addresses_add(struct _ip_addresses **list, const char *dev, const char *ip);
+int ip_addresses_search(struct _ip_addresses *list, const char *ip);
+void ip_addresses_free(struct _ip_addresses **list);
+
 
 #define strcopy(dst, dst_size, src) \
 	strncpy(dst, src, (dst_size - 1)); 

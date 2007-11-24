@@ -1,8 +1,12 @@
-$Id: ChangeLog,v 1.5 2007/05/26 11:48:08 danny Exp $
+$Id: ChangeLog,v 1.6 2007/11/24 13:18:48 danny Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.9
+- Added '-R' option to show routed connections instead of showing them with '-L'
+- Some allocation & free bugs were squashed
+
 version: 1.4.8
 - Added 'nf_conntrack' support
 - Added NAT host connection information (used IP and port for NAT)
