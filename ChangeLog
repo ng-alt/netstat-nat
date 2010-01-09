@@ -1,8 +1,11 @@
-$Id: ChangeLog,v 1.6 2007/11/24 13:18:48 danny Exp $
+$Id: ChangeLog,v 1.7 2010/01/09 19:34:24 danny Exp $
 
 
 Changelog:
 --------------------------------------------------------------------------------
+version: 1.4.10
+- fix for properly display DNAT over SNAT connection
+
 version: 1.4.9
 - Added '-R' option to show routed connections instead of showing them with '-L'
 - Some allocation & free bugs were squashed

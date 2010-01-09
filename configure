@@ -2028,7 +2028,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=netstat-nat
- VERSION=1.4.9
+ VERSION=1.4.10
 
 
 cat >>confdefs.h <<_ACEOF

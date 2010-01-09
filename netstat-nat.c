@@ -1,9 +1,12 @@
 /*
 #-------------------------------------------------------------------------------
 #                                                                                                                         
-# $Id: netstat-nat.c,v 1.32 2007/11/24 13:18:48 danny Exp $     
+# $Id: netstat-nat.c,v 1.33 2010/01/09 19:34:24 danny Exp $     
 #       
 # $Log: netstat-nat.c,v $
+# Revision 1.33  2010/01/09 19:34:24  danny
+# fix for properly display DNAT over SNAT connection
+#
 # Revision 1.32  2007/11/24 13:18:48  danny
 # - Added '-R' option to show routed connections instead of showing them with '-L'
 # - Some allocation & free bugs were squashed
@@ -178,7 +181,7 @@ typedef struct _ip_addresses
 } sIpAddresses;
 #include "netstat-nat.h"
 
-static char const rcsid[] = "$Id: netstat-nat.c,v 1.32 2007/11/24 13:18:48 danny Exp $";
+static char const rcsid[] = "$Id: netstat-nat.c,v 1.33 2010/01/09 19:34:24 danny Exp $";
 char SRC_IP[50];
 char DST_IP[50];
 int SNAT = 1;
@@ -209,6 +212,7 @@ int main(int argc, char *argv[])
     char from[50] = "NATed Address";
     char nathost[50] = "NAT-host Address";
     char dest[50] = "Destination Address";
+    char *ret;
     
     char ***pa;
     char *store;
@@ -221,9 +225,6 @@ int main(int argc, char *argv[])
     char *ifbuf, *facename,  *ptr;
     int facefound, lastlen, len, sock;
     //IpAddresses = NULL;
-    /* */
-    
-    connection_table = (char ***) xcalloc((1) * sizeof(char **));
 
     // check parameters
     while ((c = getopt(argc, argv, args)) != -1) {
@@ -299,7 +300,8 @@ int main(int argc, char *argv[])
     }
     // get local IP addresses 
     if (ROUTED || LOCAL) {
-	/* find all interfaces */
+	// find all interfaces
+
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
 	lastlen = 0;
 	len = 100 * sizeof(struct ifreq);
@@ -318,15 +320,15 @@ int main(int argc, char *argv[])
     		}
 	    } else {
 		if(ifc.ifc_len == lastlen)
-		/* success */
+		// success //
     		    break;
     		lastlen = ifc.ifc_len;
 	    }
-	    /* increment buffer */
+	    // increment buffer //
 	    len += 10 * sizeof(struct ifreq);
 	    free(ifbuf);
 	}
-	/* store all local addresses in memory */
+	// store all local addresses in memory //
         for(ptr = ifbuf; ptr < ifbuf + ifc.ifc_len; ) {
 	    req = (struct ifreq *)ptr;
 	    ipaddr = (struct sockaddr_in *) &req->ifr_addr;
@@ -338,7 +340,8 @@ int main(int argc, char *argv[])
 	    free(ifbuf);
 	}
     }
-    
+
+    connection_table = (char ***) xcalloc((1) * sizeof(char **));
     // some checking for IPTables and read file
     if ((f = fopen(NF_CONNTRACK_LOCATION, "r")) == NULL) {
 	if ((f = fopen(IP_CONNTRACK_LOCATION, "r")) == NULL) {
@@ -373,21 +376,21 @@ int main(int argc, char *argv[])
     // bugfix for proper read-in on some systems, provided by Supaflyster
     while (!feof(f)) 
     {
-	fgets(line, sizeof(line), f);
+	ret = fgets(line, sizeof(line), f);
 	if (strlen(line) > 0) {
     	    process_entry(line);
 	}
 	memset(line, 0, sizeof(line));
     }
-
     fclose(f);
-    
-    
+        
     // create index of arrays pointed to main connection array
     if (connection_index == 0) {
-	// There are no connections at this moment!
+	// There are no connections at this moment! free mem and exit
+	free(connection_table);
+        ip_addresses_free(&IpAddresses);
 	return (0);
-	}
+    }
     
     pa = (char ***) xcalloc((connection_index) * sizeof(char **));
 
@@ -633,12 +636,18 @@ void process_entry(char *line)
     }
     if (DNAT) {
 	if ((strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0)) {		
-	    check_src_dst(protocol, srcip_f, srcip_s, srcport, dstport, dstip_f, dstport_s, state);
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, dstip_f, dstport_s, state);
 	}
     }
-    // bugfix for displaying dnat over snat connections, submiited by Supaflyster
+    // bugfix for displaying dnat over snat connections, submitted by Supaflyster (intercepted traffic to DNAT) (2 interfaces)
     if (DNAT || SNAT) {
 	if ((!strcmp(srcip_f, srcip_s) == 0) && (!strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0) && (!strcmp(dstip_f, dstip_s) == 0) ) {
+	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, dstip_s, dstport_s, state);
+	}    
+    }
+    // (DNAT) (1 interface)
+    if (DNAT) {
+	if ((!strcmp(srcip_f, srcip_s) == 0) && (!strcmp(srcip_f, dstip_s) == 0) && (!strcmp(dstip_f, srcip_s) == 0) && (strcmp(dstip_f, dstip_s) == 0) ) {
 	    check_src_dst(protocol, srcip_f, srcip_s, srcport, srcport_s, dstip_s, dstport_s, state);
 	}    
     }
@@ -987,7 +996,7 @@ void get_protocol_name(char *protocol_name, int protocol_nr)
 
 
 void display_help()
-    {
+{
     printf("args: -h: displays this help\n");
     printf("      -n: don't resolve host/portnames\n");
     printf("      -p <protocol>        : display connections by protocol\n");
@@ -1005,7 +1014,7 @@ void display_help()
     printf("\n");
     printf("      netstat-nat [-S|-D|-L|-R] [-no]\n");
     printf("      netstat-nat [-nxo]\n");
-    }
+}
 
 // -- End of internal used functions
 
