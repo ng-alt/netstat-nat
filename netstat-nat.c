@@ -357,11 +357,11 @@ int main(int argc, char *argv[])
 	    strcopy(dest, sizeof(dest), "Destination Address");
 	    }
 	if (!EXT_VIEW) {
-	    printf("%-6s%-31s", "Proto", from);
+	    printf("%-6s%-36s", "Proto", from);
 	    if (NAT_HOP && !LOCAL) {
-		printf("%-31s", nathost);
+		printf("%-36s", nathost);
 	    }
-	    printf("%-31s%-6s" ,dest, "State");
+	    printf("%-36s%-6s" ,dest, "State");
 	    printf("\n");
 	} else {
 	    printf("%-6s%-41s", "Proto", from);
@@ -438,33 +438,33 @@ int main(int argc, char *argv[])
 	    }
 	if (!EXT_VIEW) {
 	    strcopy(buf, sizeof(buf), ""); 
-	    strncat(buf, pa[index][1], 29 - strlen(pa[index][3]));    
+	    strncat(buf, pa[index][1], 34 - strlen(pa[index][3]));    
 	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
                 snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][3]);            
 	    }
             else {
                 snprintf(buf2, sizeof(buf2), "%s", buf);
             }
-            snprintf(src, sizeof(src),  "%-31s", buf2);
+            snprintf(src, sizeof(src),  "%-36s", buf2);
 	    strcopy(buf, sizeof(buf), ""); 
-	    strncat(buf, pa[index][2], 29 - strlen(pa[index][4]));    
+	    strncat(buf, pa[index][2], 34 - strlen(pa[index][4]));    
 	    if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
                 snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][4]);            
 	    }
             else {
 	        snprintf(buf2, sizeof(buf2), "%s", buf);
             }
-	    snprintf(dst, sizeof(dst), "%-31s", buf2);
+	    snprintf(dst, sizeof(dst), "%-36s", buf2);
 	    if (NAT_HOP) {
 		strcopy(buf, sizeof(buf), ""); 
-		strncat(buf, pa[index][6], 29 - strlen(pa[index][7]));    
+		strncat(buf, pa[index][6], 34 - strlen(pa[index][7]));    
 		if (!strcmp(pa[index][0], "tcp") || !strcmp(pa[index][0], "udp")) {
             	    snprintf(buf2, sizeof(buf2), "%s:%s", buf, pa[index][7]);            
 		}
         	else {
 	    	    snprintf(buf2, sizeof(buf2), "%s", buf);
         	}
-		snprintf(host, sizeof(dst), "%-31s", buf2);
+		snprintf(host, sizeof(dst), "%-36s", buf2);
 	    }
 	} else {
 	    strcopy(buf, sizeof(buf), ""); 
